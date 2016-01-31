@@ -27,7 +27,7 @@
 
     <properties>
         <VERSION>${project.version}</VERSION>
-        <BUILD>${implementation.build}; ${maven.build.timestamp}</BUILD>
+        <BUILD>${implementation.build}</BUILD>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -189,7 +189,6 @@
             </plugin>
         </plugins>
     </build>
-
     <profiles>
         <profile>
             <id>qa</id>
