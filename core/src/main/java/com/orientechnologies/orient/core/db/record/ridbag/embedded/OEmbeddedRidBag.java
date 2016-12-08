@@ -25,8 +25,6 @@ import com.orientechnologies.common.util.OCommonConst;
 import com.orientechnologies.common.util.OResettable;
 import com.orientechnologies.common.util.OSizeable;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeEvent;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeListener;
@@ -40,15 +38,18 @@ import com.orientechnologies.orient.core.serialization.serializer.binary.impl.OL
 import java.util.*;
 
 public class OEmbeddedRidBag implements ORidBagDelegate {
-  private boolean                                                       contentWasChanged = false;
+  private byte[] serializedContent = null;
 
-  private Object[]                                                      entries           = OCommonConst.EMPTY_OBJECT_ARRAY;
-  private int                                                           entriesLength     = 0;
+  private boolean contentWasChanged = false;
+  private boolean deserialized      = true;
 
-  private boolean                                                       convertToRecord   = true;
-  private int                                                           size              = 0;
+  private Object[] entries       = OCommonConst.EMPTY_OBJECT_ARRAY;
+  private int      entriesLength = 0;
 
-  private transient ORecord                                             owner;
+  private boolean convertToRecord = true;
+  private int     size            = 0;
+
+  private transient ORecord owner;
 
   private List<OMultiValueChangeListener<OIdentifiable, OIdentifiable>> changeListeners;
 
@@ -168,6 +169,8 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
     if (identifiable == null)
       return false;
 
+    doDeserialization();
+
     for (int i = 0; i < entriesLength; i++) {
       if (identifiable.equals(entries[i]))
         return true;
@@ -218,13 +221,16 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
     size++;
     contentWasChanged = true;
 
-    fireCollectionChangedEvent(new OMultiValueChangeEvent<OIdentifiable, OIdentifiable>(OMultiValueChangeEvent.OChangeType.ADD,
-        identifiable, identifiable));
+    fireCollectionChangedEvent(
+        new OMultiValueChangeEvent<OIdentifiable, OIdentifiable>(OMultiValueChangeEvent.OChangeType.ADD, identifiable,
+            identifiable));
   }
 
   public OEmbeddedRidBag copy() {
     final OEmbeddedRidBag copy = new OEmbeddedRidBag();
+    copy.serializedContent = serializedContent;
     copy.contentWasChanged = contentWasChanged;
+    copy.deserialized = deserialized;
     copy.entries = entries;
     copy.entriesLength = entriesLength;
     copy.convertToRecord = convertToRecord;
@@ -238,6 +244,7 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
 
   @Override
   public void remove(OIdentifiable identifiable) {
+    doDeserialization();
 
     if (removeEntry(identifiable)) {
       size--;
@@ -259,16 +266,22 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
 
   @Override
   public Iterator<OIdentifiable> iterator() {
+    doDeserialization();
+
     return new EntriesIterator(convertToRecord);
   }
 
   @Override
   public Iterator<OIdentifiable> rawIterator() {
+    doDeserialization();
+
     return new EntriesIterator(false);
   }
 
   @Override
   public void convertLinks2Records() {
+    doDeserialization();
+
     for (int i = 0; i < entriesLength; i++) {
       final Object entry = entries[i];
 
@@ -326,10 +339,13 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
 
   @Override
   public String toString() {
+    if (!deserialized)
+      return "[size=" + size + "]";
+
     if (size < 10) {
       final StringBuilder sb = new StringBuilder(256);
       sb.append('[');
-      for (final Iterator<OIdentifiable> it = this.iterator(); it.hasNext();) {
+      for (final Iterator<OIdentifiable> it = this.iterator(); it.hasNext(); ) {
         try {
           OIdentifiable e = it.next();
           if (e != null) {
@@ -389,7 +405,10 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
   public int getSerializedSize() {
     int size;
 
-    size = OIntegerSerializer.INT_SIZE;
+    if (!deserialized)
+      size = serializedContent.length;
+    else
+      size = OIntegerSerializer.INT_SIZE;
 
     size += this.size * OLinkSerializer.RID_SIZE;
 
@@ -403,24 +422,33 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
 
   @Override
   public int serialize(byte[] stream, int offset, UUID ownerUuid) {
-    OIntegerSerializer.INSTANCE.serializeLiteral(size, stream, offset);
-    offset += OIntegerSerializer.INT_SIZE;
-    ODatabaseDocumentInternal db = ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+    if (!deserialized) {
+      System.arraycopy(serializedContent, 0, stream, offset, serializedContent.length);
+
+      if (contentWasChanged) {
+        OIntegerSerializer.INSTANCE.serializeLiteral(size, stream, offset);
+        offset += serializedContent.length;
+      } else {
+        offset += serializedContent.length;
+        return offset;
+      }
+
+    } else {
+      OIntegerSerializer.INSTANCE.serializeLiteral(size, stream, offset);
+      offset += OIntegerSerializer.INT_SIZE;
+    }
+
     final int totEntries = entries.length;
     for (int i = 0; i < totEntries; ++i) {
       final Object entry = entries[i];
       if (entry instanceof OIdentifiable) {
         OIdentifiable link = (OIdentifiable) entry;
         final ORID rid = link.getIdentity();
-        if (db != null && db.getTransaction().isActive()) {
-          if (!link.getIdentity().isPersistent()) {
-            link = db.getTransaction().getRecord(link.getIdentity());
-            entries[i] = link;
-          }
-        }
+        if (link.getIdentity().isTemporary())
+          link = link.getRecord();
 
-        if (link == null)
-          throw new OSerializationException("Found null entry in ridbag with rid=" + rid);
+        if( link == null )
+          throw new OSerializationException("Found null entry in ridbag with rid="+rid);
 
         OLinkSerializer.INSTANCE.serialize(link, stream, offset);
         offset += OLinkSerializer.RID_SIZE;
@@ -431,29 +459,16 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
   }
 
   @Override
-  public int deserialize(final byte[] stream, int offset) {
+  public int deserialize(final byte[] stream, final int offset) {
+    final int contentSize = getSerializedSize(stream, offset);
+
     this.size = OIntegerSerializer.INSTANCE.deserializeLiteral(stream, offset);
-    int entriesSize = OIntegerSerializer.INSTANCE.deserializeLiteral(stream, offset);
-    offset += OIntegerSerializer.INT_SIZE;
 
-    for (int i = 0; i < entriesSize; i++) {
-      ORID rid = OLinkSerializer.INSTANCE.deserialize(stream, offset);
-      offset += OLinkSerializer.RID_SIZE;
+    this.serializedContent = new byte[contentSize];
+    System.arraycopy(stream, offset, this.serializedContent, 0, contentSize);
+    deserialized = false;
 
-      OIdentifiable identifiable = null;
-      if (rid.isTemporary())
-        identifiable = rid.getRecord();
-
-      if (identifiable == null)
-        identifiable = rid;
-
-      if (identifiable == null)
-        OLogManager.instance().warn(this, "Found null reference during ridbag deserialization (rid=%s)", rid);
-      else
-        addEntry(identifiable);
-    }
-
-    return offset;
+    return offset + contentSize;
   }
 
   @Override
@@ -512,8 +527,36 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
     return i < entriesLength;
   }
 
+  private void doDeserialization() {
+    if (deserialized)
+      return;
+
+    int offset = 0;
+    int entriesSize = OIntegerSerializer.INSTANCE.deserializeLiteral(serializedContent, offset);
+    offset += OIntegerSerializer.INT_SIZE;
+
+    for (int i = 0; i < entriesSize; i++) {
+      ORID rid = OLinkSerializer.INSTANCE.deserialize(serializedContent, offset);
+      offset += OLinkSerializer.RID_SIZE;
+
+      OIdentifiable identifiable = null;
+      if (rid.isTemporary())
+        identifiable = rid.getRecord();
+
+      if (identifiable == null)
+        identifiable = rid;
+
+      if( identifiable == null )
+        OLogManager.instance().warn(this, "Found null reference during ridbag deserialization (rid=%s)", rid);
+      else
+        addEntry(identifiable);
+    }
+
+    deserialized = true;
+  }
+
   @Override
   public void replace(OMultiValueChangeEvent<Object, Object> event, Object newValue) {
-    // do nothing not needed
+    //do nothing not needed
   }
 }
