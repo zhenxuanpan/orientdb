@@ -27,17 +27,21 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.Map.Entry;
 
 import com.orientechnologies.common.serialization.types.OIntegerSerializer;
 import com.orientechnologies.common.util.OCommonConst;
 import com.orientechnologies.common.util.OResettable;
 import com.orientechnologies.common.util.OSizeable;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
+import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
+import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeEvent;
 import com.orientechnologies.orient.core.db.record.OMultiValueChangeListener;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBag;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBag.Encoding;
+import com.orientechnologies.orient.core.db.record.ridbag.sbtree.OSBTreeRidBag.Change;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBagDelegate;
 import com.orientechnologies.orient.core.exception.OSerializationException;
 import com.orientechnologies.orient.core.id.ORID;
@@ -49,11 +53,11 @@ import com.orientechnologies.orient.core.serialization.serializer.record.binary.
 import com.orientechnologies.orient.core.serialization.serializer.record.binary.OVarIntSerializer;
 
 public class OEmbeddedRidBag implements ORidBagDelegate {
-  private Object[]                                                      entries           = OCommonConst.EMPTY_OBJECT_ARRAY;
-  private int                                                           entriesLength     = 0;
+  private Object[]                                                      entries         = OCommonConst.EMPTY_OBJECT_ARRAY;
+  private int                                                           entriesLength   = 0;
 
-  private boolean                                                       convertToRecord   = true;
-  private int                                                           size              = 0;
+  private boolean                                                       convertToRecord = true;
+  private int                                                           size            = 0;
 
   private transient ORecord                                             owner;
 
@@ -403,6 +407,7 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
   }
 
   public int serializeOriginal(byte[] stream, int offset, UUID ownerUuid) {
+    ODatabaseDocument db = ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
     OIntegerSerializer.INSTANCE.serializeLiteral(size, stream, offset);
     offset += OIntegerSerializer.INT_SIZE;
 
@@ -410,8 +415,11 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
       if (entry instanceof OIdentifiable) {
         OIdentifiable link = (OIdentifiable) entry;
         final ORID rid = link.getIdentity();
-        if (link.getIdentity().isTemporary())
-          link = link.getRecord();
+        if (db != null && db.getTransaction().isActive()) {
+          if (!rid.isPersistent()) {
+            link = db.getTransaction().getRecord(rid);
+          }
+        }
 
         if (link == null)
           throw new OSerializationException("Found null entry in ridbag with rid=" + rid);
@@ -424,7 +432,7 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
   }
 
   public void serializeCompat(BytesContainer bytes, UUID oldUuid) {
-
+    ODatabaseDocument db = ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
     BytesContainer buffer = new BytesContainer();
     OVarIntSerializer.write(buffer, size);
     final int totEntries = entries.length;
@@ -433,8 +441,11 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
       if (entry instanceof OIdentifiable) {
         OIdentifiable link = (OIdentifiable) entry;
         final ORID rid = link.getIdentity();
-        if (link.getIdentity().isTemporary())
-          link = link.getRecord();
+        if (db != null && db.getTransaction().isActive()) {
+          if (!rid.isPersistent()) {
+            link = db.getTransaction().getRecord(rid);
+          }
+        }
 
         if (link == null)
           throw new OSerializationException("Found null entry in ridbag with rid=" + rid);
@@ -442,6 +453,7 @@ public class OEmbeddedRidBag implements ORidBagDelegate {
         OVarIntSerializer.write(buffer, link.getIdentity().getClusterPosition());
       }
     }
+
     bytes.append(buffer);
   }
 

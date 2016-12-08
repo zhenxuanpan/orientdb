@@ -28,6 +28,7 @@ import com.orientechnologies.common.types.OModifiableInteger;
 import com.orientechnologies.common.util.OResettable;
 import com.orientechnologies.common.util.OSizeable;
 import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
+import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.db.record.*;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBag;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBagDelegate;
@@ -49,6 +50,7 @@ import com.orientechnologies.orient.core.storage.impl.local.paginated.ORidBagUpd
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
@@ -865,6 +867,19 @@ public class OSBTreeRidBag implements ORidBagDelegate {
     if (context == null) {
       ChangeSerializationHelper.INSTANCE.serializeChanges(changes, OLinkSerializer.INSTANCE, stream, offset);
     } else {
+      ODatabaseDocument db = ODatabaseRecordThreadLocal.INSTANCE.getIfDefined();
+      for (Entry<OIdentifiable, Change> change : changes.entrySet()) {
+        if (db != null && db.getTransaction().isActive()) {
+          if (!change.getKey().getIdentity().isPersistent()) {
+            OIdentifiable toReplace = db.getTransaction().getRecord(change.getKey().getIdentity());
+            if (toReplace != null) {
+              changes.remove(change.getKey());
+              changes.put(toReplace, change.getValue());
+            }
+          }
+        }
+      }
+
       context.push(new ORidBagUpdateSerializationOperation(changes, collectionPointer));
 
       // 0-length serialized list of changes

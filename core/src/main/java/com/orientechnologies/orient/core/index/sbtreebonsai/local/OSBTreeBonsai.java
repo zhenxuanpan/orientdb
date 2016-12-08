@@ -122,15 +122,4 @@ public interface OSBTreeBonsai<K, V> extends OTreeInternal<K, V> {
 
   OBinarySerializer<V> getValueSerializer();
 
-  /**
-   * @return the identifier associated with this tree.
-   */
-  long getIdentifier();
-
-  /**
-   * Sets the identifier associated with this tree.
-   *
-   * @param value the new identifier value.
-   */
-  void setIdentifier(long value);
 }
