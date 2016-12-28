@@ -15,9 +15,13 @@
  */
 package com.orientechnologies.orient.core.storage.impl.local.paginated;
 
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
+import com.orientechnologies.orient.core.db.record.ORecordOperation;
 import com.orientechnologies.orient.core.tx.OTransaction;
+import com.orientechnologies.orient.core.tx.OTransactionIndexChanges;
+
+import java.util.List;
+import java.util.TreeMap;
+import java.util.concurrent.locks.Lock;
 
 /**
  * @author Andrey Lomakin
@@ -26,11 +30,57 @@ import com.orientechnologies.orient.core.tx.OTransaction;
 public class OStorageTransaction {
   private final OTransaction clientTx;
 
+  private boolean                                   preCommitted                 = false;
+  private Iterable<ORecordOperation>                preCommittedEntries          = null;
+  private TreeMap<String, OTransactionIndexChanges> preCommittedIndexesToCommit  = null;
+  private List<Lock[]>                              preCommittedIndexKeyLockList = null;
+  private List<ORecordOperation>                    preCommittedResult           = null;
+
   public OStorageTransaction(OTransaction clientTx) {
     this.clientTx = clientTx;
   }
 
   public OTransaction getClientTx() {
     return clientTx;
+  }
+
+  public boolean isPreCommitted() {
+    return preCommitted;
+  }
+
+  public void setPreCommitted(boolean preCommitted) {
+    this.preCommitted = preCommitted;
+  }
+
+  public Iterable<ORecordOperation> getPreCommittedEntries() {
+    return preCommittedEntries;
+  }
+
+  public void setPreCommittedEntries(Iterable<ORecordOperation> preCommittedEntries) {
+    this.preCommittedEntries = preCommittedEntries;
+  }
+
+  public TreeMap<String, OTransactionIndexChanges> getPreCommittedIndexesToCommit() {
+    return preCommittedIndexesToCommit;
+  }
+
+  public void setPreCommittedIndexesToCommit(TreeMap<String, OTransactionIndexChanges> preCommittedIndexesToCommit) {
+    this.preCommittedIndexesToCommit = preCommittedIndexesToCommit;
+  }
+
+  public List<Lock[]> getPreCommittedIndexKeyLockList() {
+    return preCommittedIndexKeyLockList;
+  }
+
+  public void setPreCommittedIndexKeyLockList(List<Lock[]> preCommittedIndexKeyLockList) {
+    this.preCommittedIndexKeyLockList = preCommittedIndexKeyLockList;
+  }
+
+  public List<ORecordOperation> getPreCommittedResult() {
+    return preCommittedResult;
+  }
+
+  public void setPreCommittedResult(List<ORecordOperation> preCommittedResult) {
+    this.preCommittedResult = preCommittedResult;
   }
 }

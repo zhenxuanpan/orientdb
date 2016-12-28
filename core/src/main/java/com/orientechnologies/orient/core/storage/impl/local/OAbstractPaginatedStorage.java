@@ -1301,9 +1301,21 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
   }
 
-  public List<ORecordOperation> commit(final OTransaction clientTx, Runnable callback) {
+  @Override
+  public List<ORecordOperation> preCommit(final OTransaction clientTx) {
+    final OStorageTransaction storageTransaction = transaction.get();
+    if (storageTransaction != null && storageTransaction.getClientTx().getId() == clientTx.getId() && storageTransaction
+        .isPreCommitted())
+      throw new OStorageException("Transaction is already pre-committed.");
+
+    return doPreCommit(clientTx);
+  }
+
+  private List<ORecordOperation> doPreCommit(final OTransaction clientTx) {
     checkOpeness();
     checkLowDiskSpaceFullCheckpointRequestsAndBackgroundDataFlushExceptions();
+
+    boolean error = false;
 
     txBegun.incrementAndGet();
 
@@ -1373,7 +1385,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
           lockIndexKeys(indexManager, indexesToCommit, indexKeyLockList);
 
           makeStorageDirty();
-          startStorageTx(clientTx);
+          final OStorageTransaction storageTransaction = startStorageTx(clientTx);
 
           lockClusters(clustersToLock);
           lockRidBags(clustersToLock, indexesToCommit);
@@ -1420,19 +1432,22 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
           commitIndexes(indexesToCommit);
 
-          endStorageTx();
-
-          OTransactionAbstract.updateCacheFromEntries(clientTx, entries, true);
-
-          txCommit.incrementAndGet();
-
+          storageTransaction.setPreCommitted(true);
+          storageTransaction.setPreCommittedEntries(entries);
+          storageTransaction.setPreCommittedIndexesToCommit(indexesToCommit);
+          storageTransaction.setPreCommittedIndexKeyLockList(indexKeyLockList);
+          storageTransaction.setPreCommittedResult(result);
         } catch (IOException ioe) {
+          error = true;
           makeRollback(clientTx, ioe);
         } catch (RuntimeException e) {
+          error = true;
           makeRollback(clientTx, e);
         } finally {
-          unlockIndexKeys(indexesToCommit, indexKeyLockList);
-          transaction.set(null);
+          if (error) {
+            unlockIndexKeys(indexesToCommit, indexKeyLockList);
+            transaction.set(null);
+          }
         }
       } finally {
         databaseRecord.getMetadata().clearThreadLocalSchemaSnapshot();
@@ -1445,6 +1460,45 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       OLogManager.instance()
           .debug(this, "%d Committed transaction %d on database '%s' (result=%s)", Thread.currentThread().getId(), clientTx.getId(),
               databaseRecord.getName(), result);
+
+    return result;
+  }
+
+  private void doPostCommit(OTransaction clientTx, OStorageTransaction storageTransaction) {
+    final Iterable<ORecordOperation> entries = storageTransaction.getPreCommittedEntries();
+    final TreeMap<String, OTransactionIndexChanges> indexesToCommit = storageTransaction.getPreCommittedIndexesToCommit();
+    final List<Lock[]> indexKeyLockList = storageTransaction.getPreCommittedIndexKeyLockList();
+
+    try {
+      endStorageTx();
+
+      OTransactionAbstract.updateCacheFromEntries(clientTx, entries, true);
+
+      txCommit.incrementAndGet();
+    } catch (IOException ioe) {
+      makeRollback(clientTx, ioe);
+    } catch (RuntimeException e) {
+      makeRollback(clientTx, e);
+    } finally {
+      unlockIndexKeys(indexesToCommit, indexKeyLockList);
+      transaction.set(null);
+    }
+  }
+
+  public List<ORecordOperation> commit(final OTransaction clientTx, Runnable callback) {
+    final OStorageTransaction storageTransaction = transaction.get();
+    final boolean preCommitted =
+        storageTransaction != null && storageTransaction.getClientTx().getId() == clientTx.getId() && storageTransaction
+            .isPreCommitted();
+
+    final List<ORecordOperation> result;
+    if (preCommitted) {
+      result = storageTransaction.getPreCommittedResult();
+      doPostCommit(clientTx, storageTransaction);
+    } else {
+      result = doPreCommit(clientTx);
+      doPostCommit(clientTx, transaction.get() /* a new transaction started by doPreCommit */);
+    }
 
     return result;
   }
@@ -2212,20 +2266,25 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
   public void rollback(final OTransaction clientTx) {
     checkOpeness();
+    final OStorageTransaction storageTransaction = transaction.get();
+    boolean preCommitted = false;
+
     stateLock.acquireReadLock();
     try {
       try {
         checkOpeness();
 
-        if (transaction.get() == null)
+        if (storageTransaction == null)
           return;
 
         if (writeAheadLog == null)
           throw new OStorageException("WAL mode is not active. Transactions are not supported in given mode");
 
-        if (transaction.get().getClientTx().getId() != clientTx.getId())
+        if (storageTransaction.getClientTx().getId() != clientTx.getId())
           throw new OStorageException(
               "Passed in and active transaction are different transactions. Passed in transaction cannot be rolled back.");
+
+        preCommitted = storageTransaction.isPreCommitted();
 
         makeStorageDirty();
         rollbackStorageTx();
@@ -2237,6 +2296,11 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       } catch (IOException e) {
         throw OException.wrapException(new OStorageException("Error during transaction rollback"), e);
       } finally {
+        if (preCommitted) {
+          final TreeMap<String, OTransactionIndexChanges> indexesToCommit = storageTransaction.getPreCommittedIndexesToCommit();
+          final List<Lock[]> indexKeyLockList = storageTransaction.getPreCommittedIndexKeyLockList();
+          unlockIndexKeys(indexesToCommit, indexKeyLockList);
+        }
         transaction.set(null);
       }
     } finally {
@@ -2919,16 +2983,18 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
     assert atomicOperationsManager.getCurrentOperation() == null;
   }
 
-  private void startStorageTx(OTransaction clientTx) throws IOException {
+  private OStorageTransaction startStorageTx(OTransaction clientTx) throws IOException {
     final OStorageTransaction storageTx = transaction.get();
     if (storageTx != null && storageTx.getClientTx().getId() != clientTx.getId())
       rollback(clientTx);
 
     assert atomicOperationsManager.getCurrentOperation() == null;
 
-    transaction.set(new OStorageTransaction(clientTx));
+    final OStorageTransaction storageTransaction = new OStorageTransaction(clientTx);
+    transaction.set(storageTransaction);
     try {
       atomicOperationsManager.startAtomicOperation((String) null, true);
+      return storageTransaction;
     } catch (RuntimeException e) {
       transaction.set(null);
       throw e;

@@ -1383,6 +1383,11 @@ public class ODistributedStorage implements OStorage, OFreezableStorageComponent
     return null;
   }
 
+  @Override
+  public List<ORecordOperation> preCommit(OTransaction transaction) {
+    throw new UnsupportedOperationException("preCommit is not supported by distributed storage");
+  }
+
   protected ODistributedRequestId acquireRecordLock(final ORecordId rid) {
     // ACQUIRE ALL THE LOCKS ON RECORDS ON LOCAL NODE BEFORE TO PROCEED
     final ODistributedRequestId localReqId = new ODistributedRequestId(dManager.getLocalNodeId(),
