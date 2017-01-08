@@ -1404,11 +1404,6 @@ public class OStorageRemote extends OStorageAbstract implements OStorageProxy {
     return null;
   }
 
-  @Override
-  public List<ORecordOperation> preCommit(OTransaction transaction) {
-    throw new UnsupportedOperationException("preCommit is not supported by remote storage");
-  }
-
   public void rollback(OTransaction iTx) {
   }
 

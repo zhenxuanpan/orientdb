@@ -1301,7 +1301,20 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
   }
 
-  @Override
+  /**
+   * Pre-commits the given transaction. Does all the same things as {@link #commit(OTransaction, Runnable)}, except the actual
+   * on-disk data modification, which is the last step of {@link #commit(OTransaction, Runnable)}.
+   * <p>
+   * On return, all locks related to the given transaction are held. Transaction must be finished with either
+   * {@link #commit(OTransaction, Runnable)} or {@link #rollback(OTransaction)} call.
+   * <p>
+   * Record validation logic is applied before the return, as a result exceptions may be thrown, like
+   * {@link ORecordDuplicatedException}.
+   *
+   * @param clientTx the transaction to pre-commit.
+   *
+   * @return the record operations list, the same as {@link #commit(OTransaction, Runnable)} returns.
+   */
   public List<ORecordOperation> preCommit(final OTransaction clientTx) {
     final OStorageTransaction storageTransaction = transaction.get();
     if (storageTransaction != null && storageTransaction.getClientTx().getId() == clientTx.getId() && storageTransaction

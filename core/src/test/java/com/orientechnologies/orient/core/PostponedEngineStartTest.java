@@ -306,11 +306,6 @@ public class PostponedEngineStartTest {
         }
 
         @Override
-        public List<ORecordOperation> preCommit(OTransaction transaction) {
-          return null;
-        }
-
-        @Override
         public void rollback(OTransaction iTx) {
 
         }
