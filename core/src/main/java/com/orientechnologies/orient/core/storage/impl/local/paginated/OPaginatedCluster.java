@@ -15,15 +15,6 @@
  */
 package com.orientechnologies.orient.core.storage.impl.local.paginated;
 
-import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DISK_CACHE_PAGE_SIZE;
-import static com.orientechnologies.orient.core.config.OGlobalConfiguration.PAGINATED_STORAGE_LOWEST_FREELIST_BOUNDARY;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.io.OFileUtils;
 import com.orientechnologies.common.log.OLogManager;
@@ -52,8 +43,16 @@ import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedSt
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
 import com.orientechnologies.orient.core.storage.impl.local.statistic.OSessionStoragePerformanceStatistic;
-
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import static com.orientechnologies.orient.core.config.OGlobalConfiguration.DISK_CACHE_PAGE_SIZE;
+import static com.orientechnologies.orient.core.config.OGlobalConfiguration.PAGINATED_STORAGE_LOWEST_FREELIST_BOUNDARY;
 
 /**
  * @author Andrey Lomakin (a.lomakin-at-orientdb.com)
@@ -1860,10 +1859,8 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
 
       long pageIndex;
 
-      final OCacheEntry pinnedStateEntry = loadPageForRead(atomicOperation, fileId, pinnedStateEntryIndex, true);
-      if (pinnedStateEntry == null) {
-        loadPageForRead(atomicOperation, fileId, pinnedStateEntryIndex, true);
-      }
+      final OCacheEntry pinnedStateEntry = loadPageForRead(atomicOperation, fileId, pinnedStateEntryIndex, true,
+          "findFreePage-read-1");
       try {
         OPaginatedClusterState freePageLists = new OPaginatedClusterState(pinnedStateEntry);
         do {
@@ -1881,7 +1878,7 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
         freePageIndex--;
 
       if (freePageIndex < FREE_LIST_SIZE) {
-        OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
+        OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, "findFreePage-write-1");
 
         //free list is broken automatically fix it
         if (cacheEntry == null) {
@@ -1913,7 +1910,7 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
   }
 
   private void updateFreePagesIndex(int prevFreePageIndex, long pageIndex, OAtomicOperation atomicOperation) throws IOException {
-    final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
+    final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, "updateFreePagesIndex-write-1");
 
     try {
       final OClusterPage localPage = new OClusterPage(cacheEntry, false);
@@ -1926,7 +1923,8 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
       long prevPageIndex = localPage.getPrevPage();
 
       if (prevPageIndex >= 0) {
-        final OCacheEntry prevPageCacheEntry = loadPageForWrite(atomicOperation, fileId, prevPageIndex, false);
+        final OCacheEntry prevPageCacheEntry = loadPageForWrite(atomicOperation, fileId, prevPageIndex, false,
+            "updateFreePagesIndex-write-2");
         try {
           final OClusterPage prevPage = new OClusterPage(prevPageCacheEntry, false);
           assert calculateFreePageIndex(prevPage) == prevFreePageIndex;
@@ -1937,7 +1935,8 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
       }
 
       if (nextPageIndex >= 0) {
-        final OCacheEntry nextPageCacheEntry = loadPageForWrite(atomicOperation, fileId, nextPageIndex, false);
+        final OCacheEntry nextPageCacheEntry = loadPageForWrite(atomicOperation, fileId, nextPageIndex, false,
+            "updateFreePagesIndex-write-3");
         try {
           final OClusterPage nextPage = new OClusterPage(nextPageCacheEntry, false);
           if (calculateFreePageIndex(nextPage) != prevFreePageIndex)
@@ -1964,7 +1963,8 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
 
       if (newFreePageIndex >= 0) {
         long oldFreePage;
-        OCacheEntry pinnedStateEntry = loadPageForRead(atomicOperation, fileId, pinnedStateEntryIndex, true);
+        OCacheEntry pinnedStateEntry = loadPageForRead(atomicOperation, fileId, pinnedStateEntryIndex, true,
+            "updateFreePagesIndex-read-1");
         try {
           OPaginatedClusterState clusterFreeList = new OPaginatedClusterState(pinnedStateEntry);
           oldFreePage = clusterFreeList.getFreeListPage(newFreePageIndex);
@@ -1973,7 +1973,8 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
         }
 
         if (oldFreePage >= 0) {
-          final OCacheEntry oldFreePageCacheEntry = loadPageForWrite(atomicOperation, fileId, oldFreePage, false);
+          final OCacheEntry oldFreePageCacheEntry = loadPageForWrite(atomicOperation, fileId, oldFreePage, false,
+              "updateFreePagesIndex-write-4");
           try {
             final OClusterPage oldFreeLocalPage = new OClusterPage(oldFreePageCacheEntry, false);
             assert calculateFreePageIndex(oldFreeLocalPage) == newFreePageIndex;
@@ -1995,7 +1996,8 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
   }
 
   private void updateFreePagesList(int freeListIndex, long pageIndex, OAtomicOperation atomicOperation) throws IOException {
-    final OCacheEntry pinnedStateEntry = loadPageForWrite(atomicOperation, fileId, pinnedStateEntryIndex, true);
+    final OCacheEntry pinnedStateEntry = loadPageForWrite(atomicOperation, fileId, pinnedStateEntryIndex, true,
+        "updateFreePagesList-write-1");
     try {
       OPaginatedClusterState paginatedClusterState = new OPaginatedClusterState(pinnedStateEntry);
       paginatedClusterState.setFreeListPage(freeListIndex, pageIndex);

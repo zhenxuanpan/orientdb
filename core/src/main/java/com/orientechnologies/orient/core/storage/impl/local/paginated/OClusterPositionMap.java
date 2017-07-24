@@ -199,7 +199,7 @@ public class OClusterPositionMap extends ODurableComponent {
         if (lastPage < 0)
           cacheEntry = addPage(atomicOperation, fileId);
         else
-          cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage, false, 1);
+          cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage, false);
 
         Exception exception = null;
         try {
@@ -246,7 +246,7 @@ public class OClusterPositionMap extends ODurableComponent {
         if (lastPage < 0)
           cacheEntry = addPage(atomicOperation, fileId);
         else
-          cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage, false, 1);
+          cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage, false);
 
         Exception exception = null;
         try {
@@ -296,7 +296,7 @@ public class OClusterPositionMap extends ODurableComponent {
           throw new OClusterPositionMapException(
               "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
 
-        final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, 1);
+        final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
         try {
           final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry);
           bucket.set(index, entry);
@@ -335,7 +335,7 @@ public class OClusterPositionMap extends ODurableComponent {
           throw new OClusterPositionMapException(
               "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
 
-        final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, 1);
+        final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
         try {
           final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry);
           bucket.resurrect(index, entry);
@@ -406,7 +406,7 @@ public class OClusterPositionMap extends ODurableComponent {
         int index = (int) (clusterPosition % OClusterPositionMapBucket.MAX_ENTRIES);
 
         Exception exception = null;
-        final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, 1);
+        final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false);
         try {
           final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry);
 

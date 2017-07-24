@@ -65,10 +65,20 @@ public interface OReadCache {
   long addFile(String fileName, long fileId, OWriteCache writeCache) throws IOException;
 
   OCacheEntry loadForWrite(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
-      boolean verifyChecksums) throws IOException;
+      boolean verifyChecksums, String operation) throws IOException;
+
+  default OCacheEntry loadForWrite(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
+      boolean verifyChecksums) throws IOException {
+    return loadForWrite(fileId, pageIndex, checkPinnedPages, writeCache, pageCount, verifyChecksums, "unknown-write");
+  }
 
   OCacheEntry loadForRead(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
-      boolean verifyChecksums) throws IOException;
+      boolean verifyChecksums, String operation) throws IOException;
+
+  default OCacheEntry loadForRead(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
+      boolean verifyChecksums) throws IOException {
+    return loadForRead(fileId, pageIndex, checkPinnedPages, writeCache, pageCount, verifyChecksums, "unknown-read");
+  }
 
   void releaseFromRead(OCacheEntry cacheEntry, OWriteCache writeCache);
 

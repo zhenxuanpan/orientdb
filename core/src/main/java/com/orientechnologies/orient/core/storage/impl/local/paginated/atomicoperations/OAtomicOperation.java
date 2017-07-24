@@ -79,7 +79,8 @@ public class OAtomicOperation {
     return operationUnitId;
   }
 
-  public OCacheEntry loadPage(long fileId, long pageIndex, boolean checkPinnedPages, final int pageCount) throws IOException {
+  public OCacheEntry loadPage(long fileId, long pageIndex, boolean checkPinnedPages, final int pageCount, String operation)
+      throws IOException {
     assert pageCount > 0;
 
     fileId = checkFileIdCompatibilty(fileId, storageId);
@@ -118,7 +119,7 @@ public class OAtomicOperation {
         if (pageChangesContainer.isNew) {
           return pageChangesContainer;
         } else {
-          OCacheEntry delegate = readCache.loadForRead(fileId, pageIndex, checkPinnedPages, writeCache, pageCount, true);
+          OCacheEntry delegate = readCache.loadForRead(fileId, pageIndex, checkPinnedPages, writeCache, pageCount, true, operation);
           pageChangesContainer.delegate = delegate;
           return pageChangesContainer;
         }

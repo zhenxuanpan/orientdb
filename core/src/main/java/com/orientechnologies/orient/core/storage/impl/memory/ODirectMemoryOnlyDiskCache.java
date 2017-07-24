@@ -202,7 +202,7 @@ public class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implements O
 
   @Override
   public OCacheEntry loadForWrite(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
-      boolean verifyChecksums) throws IOException {
+      boolean verifyChecksums, String operation) throws IOException {
 
     final OCacheEntry cacheEntry = doLoad(fileId, pageIndex);
 
@@ -216,7 +216,7 @@ public class ODirectMemoryOnlyDiskCache extends OAbstractWriteCache implements O
 
   @Override
   public OCacheEntry loadForRead(long fileId, long pageIndex, boolean checkPinnedPages, OWriteCache writeCache, int pageCount,
-      boolean verifyChecksums) throws IOException {
+      boolean verifyChecksums, String operation) throws IOException {
 
     final OCacheEntry cacheEntry = doLoad(fileId, pageIndex);
 

@@ -116,7 +116,7 @@ public abstract class ODurableComponent extends OSharedResourceAdaptive {
   }
 
   /**
-   * @see OAtomicOperationsManager#startAtomicOperation(com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent, * boolean)
+   * @see OAtomicOperationsManager#startAtomicOperation(ODurableComponent, boolean)
    */
   protected OAtomicOperation startAtomicOperation(boolean trackNonTxOperations) throws IOException {
     return atomicOperationsManager.startAtomicOperation(this, trackNonTxOperations);
@@ -131,15 +131,15 @@ public abstract class ODurableComponent extends OSharedResourceAdaptive {
 
   protected OCacheEntry loadPageForWrite(final OAtomicOperation atomicOperation, final long fileId, final long pageIndex,
       final boolean checkPinnedPages) throws IOException {
-    return loadPageForWrite(atomicOperation, fileId, pageIndex, checkPinnedPages, 1);
+    return loadPageForWrite(atomicOperation, fileId, pageIndex, checkPinnedPages, "unknown-write");
   }
 
-  protected OCacheEntry loadPageForWrite(OAtomicOperation atomicOperation, long fileId, long pageIndex, boolean checkPinnedPages,
-      final int pageCount) throws IOException {
+  protected OCacheEntry loadPageForWrite(final OAtomicOperation atomicOperation, final long fileId, final long pageIndex,
+      final boolean checkPinnedPages, String operation) throws IOException {
     if (atomicOperation == null)
-      return readCache.loadForWrite(fileId, pageIndex, checkPinnedPages, writeCache, 1, true);
+      return readCache.loadForWrite(fileId, pageIndex, checkPinnedPages, writeCache, 1, true, operation);
 
-    return atomicOperation.loadPage(fileId, pageIndex, checkPinnedPages, 1);
+    return atomicOperation.loadPage(fileId, pageIndex, checkPinnedPages, 1, operation);
   }
 
   protected OCacheEntry loadPageForRead(final OAtomicOperation atomicOperation, final long fileId, final long pageIndex,
@@ -147,12 +147,22 @@ public abstract class ODurableComponent extends OSharedResourceAdaptive {
     return loadPageForRead(atomicOperation, fileId, pageIndex, checkPinnedPages, 1);
   }
 
+  protected OCacheEntry loadPageForRead(final OAtomicOperation atomicOperation, final long fileId, final long pageIndex,
+      final boolean checkPinnedPages, String operation) throws IOException {
+    return loadPageForRead(atomicOperation, fileId, pageIndex, checkPinnedPages, 1, operation);
+  }
+
   protected OCacheEntry loadPageForRead(OAtomicOperation atomicOperation, long fileId, long pageIndex, boolean checkPinnedPages,
       final int pageCount) throws IOException {
-    if (atomicOperation == null)
-      return readCache.loadForRead(fileId, pageIndex, checkPinnedPages, writeCache, pageCount, true);
+    return loadPageForRead(atomicOperation, fileId, pageIndex, checkPinnedPages, pageCount, "unknown-read");
+  }
 
-    return atomicOperation.loadPage(fileId, pageIndex, checkPinnedPages, pageCount);
+  protected OCacheEntry loadPageForRead(OAtomicOperation atomicOperation, long fileId, long pageIndex, boolean checkPinnedPages,
+      final int pageCount, String operation) throws IOException {
+    if (atomicOperation == null)
+      return readCache.loadForRead(fileId, pageIndex, checkPinnedPages, writeCache, pageCount, true, operation);
+
+    return atomicOperation.loadPage(fileId, pageIndex, checkPinnedPages, pageCount, operation);
   }
 
   protected void pinPage(OAtomicOperation atomicOperation, OCacheEntry cacheEntry) throws IOException {
