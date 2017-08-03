@@ -19,6 +19,7 @@
  */
 package com.orientechnologies.orient.core.db.tool;
 
+import com.orientechnologies.common.io.OFileUtils;
 import com.orientechnologies.common.io.OIOException;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.serialization.types.OBinarySerializer;
@@ -27,7 +28,10 @@ import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.config.OStorageConfiguration;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.id.ORID;
-import com.orientechnologies.orient.core.index.*;
+import com.orientechnologies.orient.core.index.OIndex;
+import com.orientechnologies.orient.core.index.OIndexDefinition;
+import com.orientechnologies.orient.core.index.OIndexManager;
+import com.orientechnologies.orient.core.index.ORuntimeKeyIndexDefinition;
 import com.orientechnologies.orient.core.iterator.ORecordIteratorCluster;
 import com.orientechnologies.orient.core.metadata.OMetadataInternal;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
@@ -39,7 +43,11 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.serialization.serializer.OJSONWriter;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
 
-import java.io.*;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.zip.Deflater;
 import java.util.zip.GZIPOutputStream;
@@ -57,6 +65,8 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
   protected int compressionLevel  = Deflater.BEST_SPEED;
   protected int compressionBuffer = 16384;              // 16Kb
 
+  private final String tempFileName;
+
   public ODatabaseExport(final ODatabaseDocumentInternal iDatabase, final String iFileName, final OCommandOutputListener iListener)
       throws IOException {
     super(iDatabase, iFileName, iListener);
@@ -67,13 +77,12 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
     if (!fileName.endsWith(".gz")) {
       fileName += ".gz";
     }
-    final File f = new File(fileName);
-    if (f.getParentFile() != null)
-      f.getParentFile().mkdirs();
-    if (f.exists())
-      f.delete();
+    OFileUtils.prepareForFileCreationOrReplacement(Paths.get(fileName), this, "exporting");
 
-    final GZIPOutputStream gzipOS = new GZIPOutputStream(new FileOutputStream(fileName), compressionBuffer) {
+    this.tempFileName = fileName + ".tmp";
+    OFileUtils.prepareForFileCreationOrReplacement(Paths.get(tempFileName), this, "exporting");
+
+    final GZIPOutputStream gzipOS = new GZIPOutputStream(new FileOutputStream(tempFileName), compressionBuffer) {
       {
         def.setLevel(compressionLevel);
       }
@@ -86,6 +95,7 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
   public ODatabaseExport(final ODatabaseDocumentInternal iDatabase, final OutputStream iOutputStream,
       final OCommandOutputListener iListener) throws IOException {
     super(iDatabase, "streaming", iListener);
+    this.tempFileName = null;
 
     writer = new OJSONWriter(new OutputStreamWriter(iOutputStream));
     writer.beginObject();
@@ -259,7 +269,17 @@ public class ODatabaseExport extends ODatabaseImpExpAbstract {
       writer.close();
       writer = null;
     } catch (IOException e) {
+      OLogManager.instance().error(this, "Error on exporting database '%s' to: %s", e, database.getName(), fileName);
+      throw new ODatabaseExportException("Error on exporting database '" + database.getName() + "' to: " + fileName, e);
     }
+
+    if (tempFileName != null) // may be null if writing to an output stream w/o file
+      try {
+        OFileUtils.atomicMoveWithFallback(Paths.get(tempFileName), Paths.get(fileName), this);
+      } catch (IOException e) {
+        OLogManager.instance().error(this, "Error on exporting database '%s' to: %s", e, database.getName(), fileName);
+        throw new ODatabaseExportException("Error on exporting database '" + database.getName() + "' to: " + fileName, e);
+      }
   }
 
   protected int getMaxClusterId() {

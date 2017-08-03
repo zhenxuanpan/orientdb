@@ -234,18 +234,47 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
     try {
       acquireExclusiveLock();
       try {
-        final String newFileName = file.getName() + "$temp";
+        final String tempFileName = file.getName() + "$temp";
+        try {
+          final long tempFileId = writeCache.addFile(tempFileName);
+          writeCache.replaceFileContentWith(tempFileId, file.toPath());
 
-        final File rootDir = new File(storageLocal.getConfiguration().getDirectory());
-        final File newFile = new File(rootDir, newFileName);
+          readCache.deleteFile(fileId, writeCache);
+          writeCache.renameFile(tempFileId, getFullName());
+          fileId = tempFileId;
+        } finally {
+          // If, for some reason, the temp file is still exists, wipe it out.
 
-        OFileUtils.copyFile(file, newFile);
+          final long tempFileId = writeCache.fileIdByName(tempFileName);
+          if (tempFileId >= 0)
+            writeCache.deleteFile(tempFileId);
+        }
+      } finally {
+        releaseExclusiveLock();
+      }
+    } finally {
+      completeOperation();
+    }
+  }
 
-        final long newFileId = writeCache.loadFile(newFileName);
+  public void replaceClusterMapFile(File file) throws IOException {
+    startOperation();
+    try {
+      acquireExclusiveLock();
+      try {
+        final String tempFileName = file.getName() + "$temp";
+        try {
+          final long tempFileId = writeCache.addFile(tempFileName);
+          writeCache.replaceFileContentWith(tempFileId, file.toPath());
 
-        readCache.deleteFile(fileId, writeCache);
-        fileId = newFileId;
-        writeCache.renameFile(fileId, getFullName());
+          readCache.deleteFile(clusterPositionMap.getFileId(), writeCache);
+          writeCache.renameFile(tempFileId, clusterPositionMap.getFullName());
+          clusterPositionMap.replaceFileId(tempFileId);
+        } finally {
+          final long tempFileId = writeCache.fileIdByName(tempFileName);
+          if (tempFileId >= 0)
+            writeCache.deleteFile(tempFileId);
+        }
       } finally {
         releaseExclusiveLock();
       }

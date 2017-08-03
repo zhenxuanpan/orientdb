@@ -19,15 +19,14 @@
  */
 package com.orientechnologies.common.io;
 
+import com.orientechnologies.common.log.OLogManager;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.util.Locale;
 
 public class OFileUtils {
@@ -212,4 +211,43 @@ public class OFileUtils {
 
     return OFileUtilsJava7.delete(file);
   }
+
+  /**
+   * Prepares the path for a file creation or replacement. If the file pointed by the path already exists, it will be deleted,
+   * a warning will be emitted to the log in this case. All absent directories along the path will be created.
+   *
+   * @param path      the file path.
+   * @param requester the requester of an operation being performed to produce user-friendly log messages.
+   * @param operation the description of an operation being performed to produce user-friendly log messages. Use descriptions like
+   *                  "exporting", "backing up", etc.
+   */
+  public static void prepareForFileCreationOrReplacement(Path path, Object requester, String operation) throws IOException {
+    if (Files.deleteIfExists(path))
+      OLogManager.instance().warn(requester, "'%s' deleted while %s", path, operation);
+
+    final Path parent = path.getParent();
+    if (parent != null)
+      Files.createDirectories(parent);
+  }
+
+  /**
+   * Tries to move a file from the source to the target atomically. If atomic move is not possible, falls back to regular move.
+   *
+   * @param source    the source to move the file from.
+   * @param target    the target to move the file to.
+   * @param requester the requester of the move being performed to produce user-friendly log messages.
+   *
+   * @see Files#move(Path, Path, CopyOption...)
+   * @see StandardCopyOption#ATOMIC_MOVE
+   */
+  public static void atomicMoveWithFallback(Path source, Path target, Object requester) throws IOException {
+    try {
+      Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+    } catch (AtomicMoveNotSupportedException e) {
+      OLogManager.instance()
+          .warn(requester, "atomic file move is not possible, falling back to regular move (moving '%s' to '%s')", source, target);
+      Files.move(source, target);
+    }
+  }
+
 }
