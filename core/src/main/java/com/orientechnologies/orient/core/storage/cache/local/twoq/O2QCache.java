@@ -707,7 +707,17 @@ public class O2QCache implements OReadCache {
       System.out.println("* stat for " + writeCache.getRootDirectory());
       final Map<String, AtomicLong> sortedStat = new TreeMap<>(stat);
       for (Map.Entry<String, AtomicLong> entry : sortedStat.entrySet()) {
-        System.out.println(entry.getKey() + " = " + entry.getValue());
+        final String key = entry.getKey();
+
+        if (key.endsWith("-cached")) {
+          final String totalKey = key.substring(0, key.length() - "-cached".length()) + "-total";
+          final long total = stat.get(totalKey).get();
+          final long cached = stat.get(key).get();
+          final double hitRate = (double) cached / total * 100.0;
+
+          System.out.println(key + " = " + entry.getValue() + ", " + (double) Math.round(hitRate * 100.0) / 100.0 + "%");
+        } else
+          System.out.println(key + " = " + entry.getValue());
       }
       System.out.println();
     } finally {
