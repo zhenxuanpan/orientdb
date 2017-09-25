@@ -1343,6 +1343,7 @@ public abstract class ODatabaseDocumentAbstract extends OListenerManger<ODatabas
     return componentsFactory.binarySerializerFactory;
   }
 
+  @Deprecated
   public ODatabaseDocument begin(final OTransaction iTx) {
     begin();
     return this;
