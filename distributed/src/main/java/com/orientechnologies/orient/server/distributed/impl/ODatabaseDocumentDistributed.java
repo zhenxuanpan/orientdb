@@ -637,6 +637,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   public void rollback2pc(ODistributedRequestId transactionId) {
     ODistributedDatabase localDistributedDatabase = getStorageDistributed().getLocalDistributedDatabase();
     ODistributedTxContext txContext = localDistributedDatabase.popTxContext(transactionId);
-    txContext.destroy();
+    if (txContext != null)
+      txContext.destroy();
   }
 }
