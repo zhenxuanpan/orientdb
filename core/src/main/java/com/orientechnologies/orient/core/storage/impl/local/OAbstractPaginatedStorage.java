@@ -1529,6 +1529,71 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   }
 
   /**
+   * Scan the given transaction for new record and allocate a record id for them, the relative record id is inserted inside the
+   * transaction for future use.
+   *
+   * @param clientTx the transaction of witch allocate rids
+   */
+  public void preallocateRidsSame(final OTransaction clientTx) {
+    try {
+      checkOpenness();
+      checkLowDiskSpaceRequestsAndBackgroundDataFlushExceptionsAndBrokenPages();
+
+      @SuppressWarnings("unchecked")
+      final Iterable<ORecordOperation> entries = (Iterable<ORecordOperation>) clientTx.getAllRecordEntries();
+      final TreeMap<Integer, OCluster> clustersToLock = new TreeMap<>();
+
+      final Set<ORecordOperation> newRecords = new TreeSet<>(COMMIT_RECORD_OPERATION_COMPARATOR);
+
+      for (ORecordOperation txEntry : entries) {
+
+        if (txEntry.type == ORecordOperation.CREATED) {
+          newRecords.add(txEntry);
+          int clusterId = txEntry.getRID().getClusterId();
+          clustersToLock.put(clusterId, getClusterById(clusterId));
+        }
+      }
+      stateLock.acquireReadLock();
+      try {
+
+        checkOpenness();
+
+        makeStorageDirty();
+        atomicOperationsManager.startAtomicOperation((String) null, true);
+        try {
+          lockClusters(clustersToLock);
+
+          for (ORecordOperation txEntry : newRecords) {
+            ORecord rec = txEntry.getRecord();
+
+            if (rec.isDirty()) {
+              ORID rid = rec.getIdentity();
+              final OCluster cluster = getClusterById(rid.getClusterId());
+              OPhysicalPosition ppos = cluster.allocatePosition(ORecordInternal.getRecordType(rec));
+              assert ppos.clusterPosition == rid.getClusterPosition();
+            }
+          }
+          atomicOperationsManager.endAtomicOperation(false, null);
+        } catch (Exception e) {
+          atomicOperationsManager.endAtomicOperation(true, e);
+        }
+
+      } catch (IOException | RuntimeException ioe) {
+        throw OException.wrapException(new OStorageException("Could not preallocate RIDs"), ioe);
+      } finally {
+        stateLock.releaseReadLock();
+      }
+
+    } catch (RuntimeException ee) {
+      throw logAndPrepareForRethrow(ee);
+    } catch (Error ee) {
+      throw logAndPrepareForRethrow(ee);
+    } catch (Throwable t) {
+      throw logAndPrepareForRethrow(t);
+    }
+  }
+
+  /**
    * Traditional commit that support already temporary rid and already assigned rids
    *
    * @param clientTx the transaction to commit

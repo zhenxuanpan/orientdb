@@ -627,8 +627,10 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
     ODistributedTxContext txContext = localDistributedDatabase.popTxContext(transactionId);
     try {
       OTransactionOptimistic tx = txContext.getTransaction();
+      ((OAbstractPaginatedStorage) getStorage().getUnderlying()).preallocateRidsSame(tx);
       //This bypass the distributed layer and do a low level commit
-      super.internalCommit(tx);
+      ((OAbstractPaginatedStorage) getStorage().getUnderlying()).commitPreAllocated(tx);
+//      super.internalCommit(tx);
     } finally {
       txContext.destroy();
     }
