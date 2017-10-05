@@ -1737,7 +1737,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             }
 
             OTransactionAbstract.updateCacheFromEntries(transaction.getDatabase(), recordOperations, true);
-
             txCommit.incrementAndGet();
 
           } catch (IOException | RuntimeException e) {
@@ -1888,7 +1887,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             endStorageTx();
 
             OTransactionAbstract.updateCacheFromEntries(transaction.getDatabase(), recordOperations, true);
-
             txCommit.incrementAndGet();
 
           } catch (IOException | RuntimeException e) {
