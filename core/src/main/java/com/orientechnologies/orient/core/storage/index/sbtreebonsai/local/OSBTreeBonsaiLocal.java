@@ -1413,7 +1413,7 @@ public class OSBTreeBonsaiLocal<K, V> extends ODurableComponent implements OSBTr
     }
   }
 
-  public void publishSpaceUsage() throws IOException {
+  public long[] publishSpaceUsage() throws IOException {
     long freeSpace = 0;
     final long filedUpTo;
 
@@ -1447,9 +1447,11 @@ public class OSBTreeBonsaiLocal<K, V> extends ODurableComponent implements OSBTr
     }
 
     final long totalSize = filedUpTo * ODurablePage.MAX_PAGE_SIZE_BYTES;
-    OLogManager.instance().infoNoDb(this, "sb-tree %s uses %d%% of space. sb-tree size is "
+    OLogManager.instance().infoNoDb(this, "sb-tree '%s' uses %d%% of space. sb-tree size is "
             + "%d bytes/%d kbytes/%d megabytes/%d gigabytes. Amount of pages equals to %d.", getName(), (100 * freeSpace) / totalSize, totalSize,
         totalSize / 1024, totalSize / (1024 * 1024), totalSize / (1024L * 1024 * 1024), filedUpTo);
+
+    return new long[] {freeSpace, filedUpTo};
   }
 
   @Override

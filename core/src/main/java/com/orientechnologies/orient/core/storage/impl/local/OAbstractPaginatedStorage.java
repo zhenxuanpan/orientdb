@@ -366,6 +366,9 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   }
 
   public void publishSBTreeSpaceUsage() {
+    long totalFreeSpace = 0;
+    long totalFilledUpToo = 0;
+
     try {
       stateLock.acquireReadLock();
       try {
@@ -379,13 +382,22 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
             if (extension.equals(".sbc")) {
               final String name = fileName.substring(0, lastIndex);
               final OSBTreeBonsaiLocal<OIdentifiable, Integer> sbtreeBonsai = new OSBTreeBonsaiLocal<>(name, extension, this);
-              sbtreeBonsai.publishSpaceUsage();
+
+              final long[] result = sbtreeBonsai.publishSpaceUsage();
+              totalFreeSpace += result[0];
+              totalFilledUpToo += result[1];
             }
           }
         }
       } finally {
         stateLock.releaseReadLock();
       }
+
+      final long totalSize = totalFilledUpToo * ODurablePage.MAX_PAGE_SIZE_BYTES;
+      OLogManager.instance().infoNoDb(this, "sb-trees in total use %d%% of space. sb-trees total size is "
+              + "%d bytes/%d kbytes/%d megabytes/%d gigabytes. Amount of pages equals to %d.",
+          (100 * totalFreeSpace) / totalSize, totalSize, totalSize / 1024, totalSize / (1024 * 1024),
+          totalSize / (1024L * 1024 * 1024), totalFilledUpToo);
     } catch (RuntimeException e) {
       logAndPrepareForRethrow(e);
     } catch (Error e) {
