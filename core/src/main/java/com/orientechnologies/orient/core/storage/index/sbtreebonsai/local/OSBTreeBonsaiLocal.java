@@ -33,6 +33,7 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OAtomicOperation;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurablePage;
 import com.orientechnologies.orient.core.storage.impl.local.statistic.OSessionStoragePerformanceStatistic;
 import com.orientechnologies.orient.core.storage.index.sbtree.local.OSBTree;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.Change;
@@ -1410,6 +1411,45 @@ public class OSBTreeBonsaiLocal<K, V> extends ODurableComponent implements OSBTr
     } finally {
       completeOperation();
     }
+  }
+
+  public void publishSpaceUsage() throws IOException {
+    long freeSpace = 0;
+    final long filedUpTo;
+
+    final Lock lock = FILE_LOCK_MANAGER.acquireExclusiveLock(fileId);
+    try {
+      final OAtomicOperation atomicOperation = atomicOperationsManager.getCurrentOperation();
+      this.fileId = openFile(atomicOperation, getFullName());
+
+      filedUpTo = writeCache.getFilledUpTo(fileId);
+      final int bucketsPerPage = ODurablePage.MAX_PAGE_SIZE_BYTES / OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES;
+      final long buckets = filedUpTo * bucketsPerPage;
+
+      //we exclude sysbucket
+      for (long i = 1; i < buckets; i++) {
+        final long pageIndex = i / bucketsPerPage;
+        final int pageOffset = (int) (i - pageIndex * bucketsPerPage) * OSBTreeBonsaiBucket.MAX_BUCKET_SIZE_BYTES;
+
+        final OCacheEntry entry = readCache.loadForRead(fileId, pageIndex, false, writeCache, 1, true);
+        try {
+          final OSBTreeBonsaiBucket<K, V> bucket = new OSBTreeBonsaiBucket<>(entry, pageOffset, keySerializer, valueSerializer,
+              this);
+
+          final int bucketFreeSpace = bucket.getFreeSpace();
+          freeSpace += bucketFreeSpace;
+        } finally {
+          readCache.releaseFromRead(entry, writeCache);
+        }
+      }
+    } finally {
+      lock.unlock();
+    }
+
+    final long totalSize = filedUpTo * ODurablePage.MAX_PAGE_SIZE_BYTES;
+    OLogManager.instance().infoNoDb(this, "sb-tree %s uses %d%% of space. sb-tree size is "
+            + "%d bytes/%d kbytes/%d megabytes/%d gigabytes. Amount of pages equals to %d.", getName(), (100 * freeSpace) / totalSize, totalSize,
+        totalSize / 1024, totalSize / (1024 * 1024), totalSize / (1024L * 1024 * 1024), filedUpTo);
   }
 
   @Override

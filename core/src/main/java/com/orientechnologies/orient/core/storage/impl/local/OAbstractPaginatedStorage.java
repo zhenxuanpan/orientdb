@@ -82,6 +82,7 @@ import com.orientechnologies.orient.core.storage.impl.local.statistic.OPerforman
 import com.orientechnologies.orient.core.storage.impl.local.statistic.OSessionStoragePerformanceStatistic;
 import com.orientechnologies.orient.core.storage.index.engine.OHashTableIndexEngine;
 import com.orientechnologies.orient.core.storage.index.engine.OSBTreeIndexEngine;
+import com.orientechnologies.orient.core.storage.index.sbtreebonsai.local.OSBTreeBonsaiLocal;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OIndexRIDContainerSBTree;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManager;
 import com.orientechnologies.orient.core.storage.ridbag.sbtree.OSBTreeCollectionManagerAbstract;
@@ -362,6 +363,36 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
   @Override
   public String getCreatedAtVersion() {
     return configuration.getCreatedAtVersion();
+  }
+
+  public void publishSBTreeSpaceUsage() {
+    try {
+      stateLock.acquireReadLock();
+      try {
+        checkOpenness();
+
+        final Map<String, Long> files = writeCache.files();
+        for (String fileName : files.keySet()) {
+          final int lastIndex = fileName.lastIndexOf('.');
+          if (lastIndex > 0 && lastIndex < fileName.length()) {
+            final String extension = fileName.substring(lastIndex, fileName.length());
+            if (extension.equals(".sbc")) {
+              final String name = fileName.substring(0, lastIndex);
+              final OSBTreeBonsaiLocal<OIdentifiable, Integer> sbtreeBonsai = new OSBTreeBonsaiLocal<>(name, extension, this);
+              sbtreeBonsai.publishSpaceUsage();
+            }
+          }
+        }
+      } finally {
+        stateLock.releaseReadLock();
+      }
+    } catch (RuntimeException e) {
+      logAndPrepareForRethrow(e);
+    } catch (Error e) {
+      logAndPrepareForRethrow(e);
+    } catch (Throwable t) {
+      logAndPrepareForRethrow(t);
+    }
   }
 
   @SuppressWarnings("WeakerAccess")
@@ -2063,7 +2094,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
       final OIndexDefinition indexDefinition, final OBinarySerializer valueSerializer, final boolean isAutomatic,
       final Boolean durableInNonTxMode, final int version, final Map<String, String> engineProperties,
       final Set<String> clustersToIndex, final ODocument metadata) {
-      try {
+    try {
       checkOpenness();
 
       stateLock.acquireWriteLock();
