@@ -19,7 +19,7 @@ public class TestConcurrentSequenceGenerationIT {
   private OrientDB orientDB;
   @Before
   public void before() throws Exception {
-    server = new OServer();
+    server = new OServer(false);
     server.setServerRootDirectory(SERVER_DIRECTORY);
     server.startup(getClass().getResourceAsStream("orientdb-server-config.xml"));
     server.activate();

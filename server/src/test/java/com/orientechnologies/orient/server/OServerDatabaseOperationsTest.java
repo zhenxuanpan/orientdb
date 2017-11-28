@@ -46,7 +46,7 @@ public class OServerDatabaseOperationsTest {
     rootUser.resources = "list";
     conf.users = new OServerUserConfiguration[] { rootUser };
     conf.properties = new OServerEntryConfiguration[] { new OServerEntryConfiguration("server.database.path", "target/databases") };
-    server = new OServer();
+    server = new OServer(false);
     server.startup(conf);
     server.activate();
     ODocument securityConfig = new ODocument();

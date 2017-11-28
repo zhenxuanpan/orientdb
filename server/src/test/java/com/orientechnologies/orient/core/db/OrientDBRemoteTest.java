@@ -27,58 +27,48 @@ public class OrientDBRemoteTest {
   private static final String SERVER_DIRECTORY = "./target/dbfactory";
   private OServer server;
 
+  private OrientDB factory;
+
   @Before
   public void before() throws Exception {
     OGlobalConfiguration.SERVER_BACKWARD_COMPATIBILITY.setValue(false);
-    server = new OServer();
+    server = new OServer(false);
     server.setServerRootDirectory(SERVER_DIRECTORY);
     server.startup(
         getClass().getClassLoader().getResourceAsStream("com/orientechnologies/orient/server/network/orientdb-server-config.xml"));
     server.activate();
+
+    factory = new OrientDB("remote:localhost", "root", "root", OrientDBConfig.defaultConfig());
   }
 
   @Test
   public void createAndUseRemoteDatabase() {
-    OrientDB factory = new OrientDB("remote:localhost", "root", "root", OrientDBConfig.defaultConfig());
     if (!factory.exists("test"))
       factory.create("test", ODatabaseType.MEMORY);
 
     ODatabaseDocument db = factory.open("test", "admin", "admin");
     db.save(new ODocument(), db.getClusterNameById(db.getDefaultClusterId()));
     db.close();
-    factory.close();
   }
 
   //@Test(expected = OStorageExistsException.class)
   //TODO: Uniform database exist exceptions
   @Test(expected = OStorageException.class)
   public void doubleCreateRemoteDatabase() {
-    OrientDB factory = new OrientDB("remote:localhost", "root", "root", OrientDBConfig.defaultConfig());
-    try {
-      factory.create("test", ODatabaseType.MEMORY);
-      factory.create("test", ODatabaseType.MEMORY);
-    } finally {
-      factory.close();
-    }
+    factory.create("test", ODatabaseType.MEMORY);
+    factory.create("test", ODatabaseType.MEMORY);
   }
 
   @Test
   public void createDropRemoteDatabase() {
-    OrientDB factory = new OrientDB("remote:localhost", "root", "root", OrientDBConfig.defaultConfig());
-    try {
-      factory.create("test", ODatabaseType.MEMORY);
-      assertTrue(factory.exists("test"));
-      factory.drop("test");
-      assertFalse(factory.exists("test"));
-    } finally {
-      factory.close();
-    }
+    factory.create("test", ODatabaseType.MEMORY);
+    assertTrue(factory.exists("test"));
+    factory.drop("test");
+    assertFalse(factory.exists("test"));
   }
 
   @Test
   public void testPool() {
-    OrientDB factory = new OrientDB("remote:localhost", "root", "root", OrientDBConfig.defaultConfig());
-
     if (!factory.exists("test"))
       factory.create("test", ODatabaseType.MEMORY);
 
@@ -87,18 +77,14 @@ public class OrientDBRemoteTest {
     db.save(new ODocument(), db.getClusterNameById(db.getDefaultClusterId()));
     db.close();
     pool.close();
-    factory.close();
   }
 
   @Test
   public void testMultiThread() {
+   if (!factory.exists("test"))
+      factory.create("test", ODatabaseType.MEMORY);
 
-    OrientDB orientDb = new OrientDB("remote:localhost", "root", "root", OrientDBConfig.defaultConfig());
-
-    if (!orientDb.exists("test"))
-      orientDb.create("test", ODatabaseType.MEMORY);
-
-    ODatabasePool pool = new ODatabasePool(orientDb, "test", "admin", "admin");
+    ODatabasePool pool = new ODatabasePool(factory, "test", "admin", "admin");
 
     //do a query and assert on other thread
     Runnable acquirer = () -> {
@@ -126,14 +112,10 @@ public class OrientDBRemoteTest {
     futures.forEach(cf -> cf.join());
 
     pool.close();
-    orientDb.close();
-
   }
 
   @Test
   public void testListDatabases() {
-    OrientDB factory = new OrientDB("remote:localhost", "root", "root", OrientDBConfig.defaultConfig());
-
     assertEquals(factory.list().size(), 0);
     factory.create("test", ODatabaseType.MEMORY);
     List<String> databases = factory.list();
@@ -143,8 +125,6 @@ public class OrientDBRemoteTest {
 
   @Test
   public void testCopyOpenedDatabase() {
-    OrientDB factory = new OrientDB("remote:localhost", "root", "root", OrientDBConfig.defaultConfig());
-
     factory.create("test", ODatabaseType.MEMORY);
     ODatabaseDocument db1;
     try (ODatabaseDocumentInternal db = (ODatabaseDocumentInternal) factory.open("test", "admin", "admin")) {
@@ -157,8 +137,12 @@ public class OrientDBRemoteTest {
 
   @After
   public void after() {
+    for (String db : factory.list()) {
+      factory.drop(db);
+    }
+
+    factory.close();
     server.shutdown();
-    Orient.instance().startup();
   }
 
 }

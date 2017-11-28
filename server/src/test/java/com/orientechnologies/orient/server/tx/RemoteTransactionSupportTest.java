@@ -42,7 +42,7 @@ public class RemoteTransactionSupportTest {
   @Before
   public void before() throws Exception {
     OGlobalConfiguration.CLASS_MINIMUM_CLUSTERS.setValue(1);
-    server = new OServer();
+    server = new OServer(false);
     server.setServerRootDirectory(SERVER_DIRECTORY);
     server.startup(getClass().getResourceAsStream("orientdb-server-config.xml"));
     server.activate();
