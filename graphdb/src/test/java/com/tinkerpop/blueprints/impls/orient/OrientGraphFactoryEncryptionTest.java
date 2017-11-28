@@ -1,24 +1,24 @@
 package com.tinkerpop.blueprints.impls.orient;
 
-import com.orientechnologies.orient.core.db.ODatabase;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
+import com.orientechnologies.orient.core.db.ODatabaseSession;
+import com.orientechnologies.orient.core.db.ODatabaseType;
+import com.orientechnologies.orient.core.db.OrientDB;
+import com.orientechnologies.orient.core.db.OrientDBConfig;
 import com.orientechnologies.orient.core.exception.OSecurityException;
-import com.orientechnologies.orient.core.record.impl.ODocument;
-import com.orientechnologies.orient.core.sql.OCommandSQL;
-import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
+import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import com.orientechnologies.orient.core.storage.OStorage;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestName;
 
-import java.util.List;
+import java.io.File;
 
-import static com.orientechnologies.orient.core.config.OGlobalConfiguration.*;
-import static org.assertj.core.api.Assertions.*;
+import static com.orientechnologies.orient.core.config.OGlobalConfiguration.STORAGE_ENCRYPTION_KEY;
+import static com.orientechnologies.orient.core.config.OGlobalConfiguration.STORAGE_ENCRYPTION_METHOD;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Created by frank on 18/07/2016.
@@ -28,15 +28,19 @@ public class OrientGraphFactoryEncryptionTest {
   @Rule
   public TestName name = new TestName();
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
   private String dbPath;
+  private String dbDir;
+  private String dbName;
 
   @Before
   public void setUp() throws Exception {
-    dbPath = folder.newFolder(name.getMethodName()).getAbsolutePath();
+    final String buildDirectory = System.getProperty("buildDirectory", "target");
+    final File buildDirectoryFile = new File(buildDirectory);
 
+    dbDir = buildDirectoryFile.getCanonicalPath();
+    dbName = name.getMethodName();
+
+    dbPath = new File(buildDirectoryFile, dbName).getCanonicalPath();
   }
 
   @Test
@@ -48,79 +52,76 @@ public class OrientGraphFactoryEncryptionTest {
 
     ODatabaseDocumentInternal db = graphFactory.getDatabase();
 
+    //noinspection deprecation
     assertThat(db.getProperty(STORAGE_ENCRYPTION_KEY.getKey())).isEqualTo("T1JJRU5UREJfSVNfQ09PTA==");
     db.close();
 
     db = graphFactory.getNoTx().getDatabase();
 
+    //noinspection deprecation
     assertThat(db.getProperty(STORAGE_ENCRYPTION_KEY.getKey())).isEqualTo("T1JJRU5UREJfSVNfQ09PTA==");
     db.close();
 
     db = graphFactory.getNoTx().getRawGraph();
 
+    //noinspection deprecation
     assertThat(db.getProperty(STORAGE_ENCRYPTION_KEY.getKey())).isEqualTo("T1JJRU5UREJfSVNfQ09PTA==");
     db.close();
-    
+
     graphFactory.close();
 
   }
 
   @Test
   public void shouldQueryDESEncryptedDatabase() {
-
     OrientGraphFactory graphFactory = new OrientGraphFactory("plocal:" + dbPath);
 
     graphFactory.setProperty(STORAGE_ENCRYPTION_METHOD.getKey(), "des");
     graphFactory.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "T1JJRU5UREJfSVNfQ09PTA==");
 
-    ODatabaseDocumentTx db = graphFactory.getDatabase();
+    ODatabaseSession db = graphFactory.getDatabase();
 
-    db.command(new OCommandSQL("create class TestEncryption")).execute();
-    db.command(new OCommandSQL("insert into TestEncryption set name = 'Jay'")).execute();
+    db.command("create class TestEncryption");
+    db.command("insert into TestEncryption set name = 'Jay'");
 
-    List<ODocument> result = db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+    try (OResultSet result = db.query("select from TestEncryption")) {
+      assertThat(result).hasSize(1);
+    }
 
-    assertThat(result).hasSize(1);
     db.close();
 
     graphFactory.close();
-    
   }
 
   @Test
   public void shouldFailWitWrongKey() {
+    try (OrientDB orientDB = new OrientDB("embedded:" + dbDir, OrientDBConfig.defaultConfig())) {
+      orientDB.create(dbName, ODatabaseType.PLOCAL);
 
-    ODatabase db = new ODatabaseDocumentTx("plocal:" + dbPath);
-
-    db.setProperty(STORAGE_ENCRYPTION_METHOD.getKey(), "des");
-    db.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "T1JJRU5UREJfSVNfQ09PTA==");
-
-    db.create();
-
-    db.close();
-
-    OStorage storage = ((ODatabaseDocumentInternal) db).getStorage();
-
-    storage.close();
+      try (ODatabaseSession db = orientDB.open(dbName, "admin", "admin")) {
+        //noinspection deprecation
+        db.setProperty(STORAGE_ENCRYPTION_METHOD.getKey(), "des");
+        //noinspection deprecation
+        db.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "T1JJRU5UREJfSVNfQ09PTA==");
+      }
+    }
 
     OrientGraphFactory graphFactory = new OrientGraphFactory("plocal:" + dbPath);
 
     graphFactory.setProperty(STORAGE_ENCRYPTION_METHOD.getKey(), "des");
     graphFactory.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "T1JJRU5UREJfSVNfQ09PTA==");
 
-    db = graphFactory.getDatabase();
+    ODatabaseSession db = graphFactory.getDatabase();
 
-    db.command(new OCommandSQL("create class TestEncryption")).execute();
-    db.command(new OCommandSQL("insert into TestEncryption set name = 'Jay'")).execute();
+    db.command("create class TestEncryption");
+    db.command("insert into TestEncryption set name = 'Jay'");
 
     db.close();
-    storage = ((ODatabaseDocumentInternal) db).getStorage();
+    OStorage storage = ((ODatabaseDocumentInternal) db).getStorage();
 
     graphFactory.close();
 
     storage.close();
-    //    Orient.instance().shutdown();
-    //    Orient.instance().startup();
 
     graphFactory = new OrientGraphFactory("plocal:" + dbPath);
 
@@ -128,21 +129,23 @@ public class OrientGraphFactoryEncryptionTest {
     graphFactory.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "T1JJRU5UREJfSVNfQ09PTA==");
 
     db = graphFactory.getDatabase();
-    List<ODocument> result = db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
+    try (OResultSet result = db.query("select from TestEncryption")) {
+      assertThat(result).hasSize(1);
+    }
 
-    assertThat(result).hasSize(1);
     db.close();
     graphFactory.close();
-
   }
 
+  @Test
   public void verifyDatabaseEncryption(OrientGraphFactory fc) {
-    ODatabaseDocumentTx db = fc.getDatabase();
-    db.command(new OCommandSQL("create class TestEncryption")).execute();
-    db.command(new OCommandSQL("insert into TestEncryption set name = 'Jay'")).execute();
+    ODatabaseSession db = fc.getDatabase();
+    db.command("create class TestEncryption");
+    db.command("insert into TestEncryption set name = 'Jay'");
 
-    List result = db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
-    Assert.assertEquals(result.size(), 1);
+    try (OResultSet query = db.query("select from TestEncryption")) {
+      assertThat(query).hasSize(1);
+    }
     db.close();
 
     db = fc.getDatabase();
@@ -154,14 +157,17 @@ public class OrientGraphFactoryEncryptionTest {
     fc.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "T1JJRU5UREJfSVNfQ09PTA==");
     db = fc.getDatabase();
 
-    result = db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
-    Assert.assertEquals(result.size(), 1);
+    try (OResultSet result = db.query("select from TestEncryption")) {
+      assertThat(result).hasSize(1);
+    }
+
     storage = ((ODatabaseDocumentInternal) db).getStorage();
     db.close();
 
     storage.close(true, false);
 
     db = fc.getDatabase();
+    //noinspection deprecation
     db.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "invalidPassword");
     try {
       storage = ((ODatabaseDocumentInternal) db).getStorage();
@@ -189,8 +195,11 @@ public class OrientGraphFactoryEncryptionTest {
 
     fc.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "T1JJRU5UREJfSVNfQ09PTA==");
     db = fc.getDatabase();
-    result = db.query(new OSQLSynchQuery<ODocument>("select from TestEncryption"));
-    Assert.assertEquals(result.size(), 1);
+
+    try (OResultSet result = db.query("select from TestEncryption")) {
+      assertThat(result).hasSize(1);
+    }
+
     db.close();
 
   }
@@ -202,7 +211,7 @@ public class OrientGraphFactoryEncryptionTest {
 
     graphFactory.setProperty(STORAGE_ENCRYPTION_KEY.getKey(), "T1JJRU5UREJfSVNfQ09PTA==");
 
-    ODatabaseDocumentTx db = graphFactory.getDatabase();
+    ODatabaseSession db = graphFactory.getDatabase();
     //    verifyClusterEncryption(db, "des");
     db.close();
     graphFactory.close();
