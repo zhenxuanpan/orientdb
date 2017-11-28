@@ -5,6 +5,7 @@ import com.orientechnologies.orient.core.db.*;
 import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.server.OServer;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -73,6 +74,11 @@ public class TestConcurrentCachedSequenceGenerationIT {
     orientDB.drop(TestConcurrentCachedSequenceGenerationIT.class.getSimpleName());
     orientDB.close();
     server.shutdown();
+  }
+
+  @AfterClass
+  public static void afterClass() {
+    Orient.instance().shutdown();
     Orient.instance().startup();
   }
 }

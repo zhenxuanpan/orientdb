@@ -20,6 +20,7 @@ package com.orientechnologies.lucene.test;
 
 import com.orientechnologies.common.io.OFileUtils;
 import com.orientechnologies.common.io.OIOUtils;
+import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.ODatabaseType;
 import com.orientechnologies.orient.core.db.OrientDB;
@@ -32,6 +33,7 @@ import com.orientechnologies.orient.server.OServer;
 import com.orientechnologies.orient.server.config.OServerParameterConfiguration;
 import com.orientechnologies.orient.server.handler.OAutomaticBackup;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
@@ -141,6 +143,12 @@ public class LuceneAutomaticBackupRestoreTest {
 
       OFileUtils.deleteRecursively(tempFolder);
     }
+  }
+
+  @AfterClass
+  public static void afterClass() {
+    Orient.instance().shutdown();
+    Orient.instance().startup();
   }
 
   @Test
