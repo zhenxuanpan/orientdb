@@ -3,8 +3,10 @@ package com.orientechnologies.distribution.integration.demodb;
 import com.orientechnologies.distribution.integration.OIntegrationTestTemplate;
 import com.orientechnologies.orient.core.sql.executor.OResult;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
+import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import test.tmp.IgnoreUntil;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -135,6 +137,7 @@ public class ODemoDbFromDocumentationCustomersIT extends OIntegrationTestTemplat
   }
 
   @Test(priority = 10)
+  @Ignore
   public void test_Customers_Example_10() throws Exception {
 
     OResultSet resultSet = db.query(
