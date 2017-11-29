@@ -5,6 +5,7 @@ import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.InputStream;
@@ -91,6 +92,7 @@ public class OLuceneSearchMoreLikeThisFunctionTest extends BaseLuceneTest {
   }
 
   @Test
+  @Ignore
   public void shouldSearchMoreLikeThisWithRidOnMultiFieldsIndexWithMetadata() throws Exception {
 
     db.command("create index Song.multi on Song (title,author) FULLTEXT ENGINE LUCENE ");

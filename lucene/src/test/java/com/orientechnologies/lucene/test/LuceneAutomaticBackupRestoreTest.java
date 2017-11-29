@@ -92,6 +92,16 @@ public class LuceneAutomaticBackupRestoreTest {
     System.setProperty("ORIENTDB_HOME", tempFolder.getCanonicalPath());
 
     String path = tempFolder.getCanonicalPath() + File.separator + "databases";
+    server = new OServer(false) {
+      @Override
+      public Map<String, String> getAvailableStorageNames() {
+        HashMap<String, String> result = new HashMap<>();
+        result.put(DBNAME, URL);
+        return result;
+      }
+    };
+    server.startup();
+
     orientDB = server.getContext();
 
     URL = "plocal:" + path + File.separator + DBNAME;
@@ -102,16 +112,6 @@ public class LuceneAutomaticBackupRestoreTest {
 
     File config = new File(tempFolder, "config");
     Assert.assertTrue(config.mkdirs());
-
-    server = new OServer(false) {
-      @Override
-      public Map<String, String> getAvailableStorageNames() {
-        HashMap<String, String> result = new HashMap<>();
-        result.put(DBNAME, URL);
-        return result;
-      }
-    };
-    server.startup();
 
     dropIfExists();
 
@@ -147,8 +147,12 @@ public class LuceneAutomaticBackupRestoreTest {
 
   @AfterClass
   public static void afterClass() {
-    Orient.instance().shutdown();
-    Orient.instance().startup();
+    final Orient orient = Orient.instance();
+
+    if (orient !=null) {
+      orient.shutdown();
+      orient.startup();
+    }
   }
 
   @Test
