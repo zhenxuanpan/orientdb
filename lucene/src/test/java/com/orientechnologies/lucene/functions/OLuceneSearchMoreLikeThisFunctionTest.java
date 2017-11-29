@@ -27,6 +27,7 @@ public class OLuceneSearchMoreLikeThisFunctionTest extends BaseLuceneTest {
   }
 
   @Test
+  @Ignore
   public void shouldSearchMoreLikeThisWithRid() throws Exception {
 
     db.command("create index Song.title on Song (title) FULLTEXT ENGINE LUCENE ");
