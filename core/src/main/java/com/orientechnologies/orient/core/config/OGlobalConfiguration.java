@@ -193,8 +193,7 @@ public enum OGlobalConfiguration {
       "Indicates a force sync should be performed for each update on the storage configuration", Boolean.class, true),
 
   STORAGE_COMPRESSION_METHOD("storage.compressionMethod", "Record compression method used in storage"
-      + " Possible values : gzip, nothing. Default is 'nothing' that means no compression", String.class,
-      "nothing"),
+      + " Possible values : gzip, nothing. Default is 'nothing' that means no compression", String.class, "nothing"),
 
   STORAGE_ENCRYPTION_METHOD("storage.encryptionMethod",
       "Record encryption method used in storage" + " Possible values : 'aes' and 'des'. Default is 'nothing' for no encryption",
@@ -234,6 +233,10 @@ public enum OGlobalConfiguration {
   WAL_CACHE_SIZE("storage.wal.cacheSize",
       "Maximum size of WAL cache (in amount of WAL pages, each page is 64k) If set to 0, caching will be disabled", Integer.class,
       3000),
+
+  WAL_MINIMAL_COMPRESED_RECORD_SIZE("storage.wal.minCompressedRecordSize",
+      "Minimal size of the record which is going to be compressed, -1 means no compression will be applied, "
+          + "default value  is 256", Integer.class, 256),
 
   WAL_FILE_AUTOCLOSE_INTERVAL("storage.wal.fileAutoCloseInterval",
       "Interval in seconds after which WAL file will be closed if there is no "
@@ -635,8 +638,9 @@ public enum OGlobalConfiguration {
       Integer.class, 500),
 
   // QUERY
-  QUERY_REMOTE_RESULTSET_PAGE_SIZE("query.remoteResultSet.pageSize", "The size of a remote ResultSet page, ie. the number of records"
-      + "that are fetched together during remote query execution. This has to be set on the client.", Integer.class, 100),
+  QUERY_REMOTE_RESULTSET_PAGE_SIZE("query.remoteResultSet.pageSize",
+      "The size of a remote ResultSet page, ie. the number of records"
+          + "that are fetched together during remote query execution. This has to be set on the client.", Integer.class, 100),
 
   QUERY_PARALLEL_AUTO("query.parallelAuto", "Auto enable parallel query, if requirements are met", Boolean.class, false),
 

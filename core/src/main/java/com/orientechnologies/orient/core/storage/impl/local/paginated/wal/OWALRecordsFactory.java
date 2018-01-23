@@ -20,6 +20,14 @@
 
 package com.orientechnologies.orient.core.storage.impl.local.paginated.wal;
 
+import com.orientechnologies.common.serialization.types.OIntegerSerializer;
+import com.orientechnologies.orient.core.config.OGlobalConfiguration;
+import net.jpountz.lz4.LZ4Compressor;
+import net.jpountz.lz4.LZ4Factory;
+import net.jpountz.lz4.LZ4FastDecompressor;
+
+import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,10 +36,14 @@ import java.util.Map;
  * @since 25.04.13
  */
 public class OWALRecordsFactory {
+  private static final LZ4Factory factory                    = LZ4Factory.fastestInstance();
+  private static final int        MIN_COMPRESSED_RECORD_SIZE = OGlobalConfiguration.WAL_MINIMAL_COMPRESED_RECORD_SIZE
+      .getValueAsInteger();
+
   private final Map<Byte, Class> idToTypeMap = new HashMap<>();
   private final Map<Class, Byte> typeToIdMap = new HashMap<>();
 
-  public static final OWALRecordsFactory INSTANCE    = new OWALRecordsFactory();
+  public static final OWALRecordsFactory INSTANCE = new OWALRecordsFactory();
 
   public byte[] toStream(OWALRecord walRecord) {
     int contentSize = walRecord.serializedSize() + 1;
@@ -66,11 +78,39 @@ public class OWALRecordsFactory {
 
     walRecord.toStream(content, 1);
 
+    if (MIN_COMPRESSED_RECORD_SIZE > 0 && content.length < MIN_COMPRESSED_RECORD_SIZE) {
+      return content;
+    }
+
+    final LZ4Compressor compressor = factory.fastCompressor();
+    final int maxCompressedLength = compressor.maxCompressedLength(content.length - 1);
+
+    final byte[] compressed = new byte[maxCompressedLength + 5];
+
+    final int compressedLength = compressor.compress(content, 1, content.length - 1, compressed, 5, maxCompressedLength);
+
+    if (compressedLength + 5 < content.length) {
+      compressed[0] = (byte) (-(content[0] + 1));
+      OIntegerSerializer.INSTANCE.serializeNative(content.length - 1, compressed, 1);
+      return Arrays.copyOf(compressed, compressedLength + 5);
+    }
+
     return content;
   }
 
   public OWALRecord fromStream(byte[] content) {
     OWALRecord walRecord;
+
+    if (content[0] < 0) {
+      final int decompressedLength = OIntegerSerializer.INSTANCE.deserializeNative(content, 1);
+      final byte[] restored = new byte[decompressedLength + 1];
+
+      final LZ4FastDecompressor decompressor = factory.fastDecompressor();
+      decompressor.decompress(content, 5, restored, 1, decompressedLength);
+      restored[0] = (byte) (-content[0] - 1);
+      content = restored;
+    }
+
     switch (content[0]) {
     case 0:
       walRecord = new OUpdatePageRecord();
