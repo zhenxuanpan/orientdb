@@ -27,7 +27,7 @@ import com.orientechnologies.common.serialization.types.OLongSerializer;
  * @since 26.04.13
  */
 public class OUpdatePageRecord extends OAbstractPageWALRecord {
-  private OWALChanges        changes;
+  private OPageChanges        changes;
   /**
    * Previous value of LSN for current page.
    * This value is used when we want to rollback changes of not completed transactions after restore.
@@ -39,13 +39,13 @@ public class OUpdatePageRecord extends OAbstractPageWALRecord {
   }
 
   public OUpdatePageRecord(final long pageIndex, final long fileId, final OOperationUnitId operationUnitId,
-      final OWALChanges changes, final OLogSequenceNumber prevLsn) {
+      final OPageChanges changes, final OLogSequenceNumber prevLsn) {
     super(pageIndex, fileId, operationUnitId);
     this.changes = changes;
     this.prevLsn = prevLsn;
   }
 
-  public OWALChanges getChanges() {
+  public OPageChanges getChanges() {
     return changes;
   }
 
@@ -87,7 +87,7 @@ public class OUpdatePageRecord extends OAbstractPageWALRecord {
   public int fromStream(final byte[] content, int offset) {
     offset = super.fromStream(content, offset);
 
-    changes = new OWALPageChangesPortion();
+    changes = new OPageChanges();
     offset = changes.fromStream(offset, content);
 
     final long segment = OLongSerializer.INSTANCE.deserializeNative(content, offset);

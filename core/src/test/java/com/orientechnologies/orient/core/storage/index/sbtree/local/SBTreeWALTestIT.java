@@ -307,7 +307,7 @@ public class SBTreeWALTestIT extends SBTreeTestIT {
 
             try {
               ODurablePage durablePage = new ODurablePage(cacheEntry);
-              durablePage.restoreChanges(updatePageRecord.getChanges());
+              //durablePage.restoreData(updatePageRecord.getChanges());
               durablePage.setLsn(updatePageRecord.getLsn());
 
               cacheEntry.markDirty();

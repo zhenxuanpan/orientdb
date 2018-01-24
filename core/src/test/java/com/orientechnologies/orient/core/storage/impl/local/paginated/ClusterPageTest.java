@@ -6,8 +6,7 @@ import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.OCacheEntryImpl;
 import com.orientechnologies.orient.core.storage.cache.OCachePointer;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.atomicoperations.OCacheEntryChanges;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
-import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALChanges;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OPageChanges;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -1271,10 +1270,9 @@ public class ClusterPageTest {
     OCacheEntry cacheEntry = new OCacheEntryImpl(0, 0, cachePointer, false);
     cacheEntry.acquireExclusiveLock();
     try {
-      OClusterPage restoredPage = new OClusterPage(cacheEntry, false);
-
-      OWALChanges changes = localPage.getChanges();
-      restoredPage.restoreChanges(changes);
+      ByteBuffer restoreBuffer = cacheEntry.getCachePointer().getExclusiveBuffer();
+      OPageChanges changes = localPage.getChanges();
+      changes.applyData(restoreBuffer);
 
       //      Assert.assertEquals(getBytes(restoredBuffer, SYSTEM_OFFSET, OClusterPage.PAGE_SIZE - SYSTEM_OFFSET),
       //          getBytes(buffer, SYSTEM_OFFSET, OClusterPage.PAGE_SIZE - SYSTEM_OFFSET));

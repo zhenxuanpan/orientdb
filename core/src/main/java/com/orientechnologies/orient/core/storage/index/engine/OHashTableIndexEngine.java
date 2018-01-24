@@ -65,11 +65,7 @@ public final class OHashTableIndexEngine implements OIndexEngine {
       durableInNonTx = durableInNonTxMode;
 
     this.version = version;
-    if (version < 2)
-      hashTable = new OLocalHashTable20<Object, Object>(name, METADATA_FILE_EXTENSION, TREE_FILE_EXTENSION, BUCKET_FILE_EXTENSION,
-          NULL_BUCKET_FILE_EXTENSION, hashFunction, durableInNonTx, storage);
-    else
-      hashTable = new OLocalHashTable<Object, Object>(name, METADATA_FILE_EXTENSION, TREE_FILE_EXTENSION, BUCKET_FILE_EXTENSION,
+     hashTable = new OLocalHashTable<Object, Object>(name, METADATA_FILE_EXTENSION, TREE_FILE_EXTENSION, BUCKET_FILE_EXTENSION,
           NULL_BUCKET_FILE_EXTENSION, hashFunction, storage);
 
     this.name = name;

@@ -202,10 +202,11 @@ public class OClusterPositionMap extends ODurableComponent {
           cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage, false, 1);
 
         Exception exception = null;
+        OClusterPositionMapBucket bucket = null;
         try {
-          OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry);
+          bucket = new OClusterPositionMapBucket(cacheEntry);
           if (bucket.isFull()) {
-            releasePageFromWrite(atomicOperation, cacheEntry);
+            releasePageFromWrite(atomicOperation, bucket);
 
             cacheEntry = addPage(atomicOperation, fileId);
 
@@ -221,7 +222,7 @@ public class OClusterPositionMap extends ODurableComponent {
                   this), e);
         } finally {
           try {
-            releasePageFromWrite(atomicOperation, cacheEntry);
+            releasePageFromWrite(atomicOperation, bucket);
           } finally {
             endAtomicOperation(exception != null, exception);
           }
@@ -249,11 +250,12 @@ public class OClusterPositionMap extends ODurableComponent {
           cacheEntry = loadPageForWrite(atomicOperation, fileId, lastPage, false, 1);
 
         Exception exception = null;
+        OClusterPositionMapBucket bucket = null;
         try {
 
-          OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry);
+          bucket = new OClusterPositionMapBucket(cacheEntry);
           if (bucket.isFull()) {
-            releasePageFromWrite(atomicOperation, cacheEntry);
+            releasePageFromWrite(atomicOperation, bucket);
 
             cacheEntry = addPage(atomicOperation, fileId);
 
@@ -269,7 +271,7 @@ public class OClusterPositionMap extends ODurableComponent {
                   this), e);
         } finally {
           try {
-            releasePageFromWrite(atomicOperation, cacheEntry);
+            releasePageFromWrite(atomicOperation, bucket);
           } finally {
             endAtomicOperation(exception != null, exception);
           }
@@ -297,11 +299,12 @@ public class OClusterPositionMap extends ODurableComponent {
               "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
 
         final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, 1);
+        OClusterPositionMapBucket bucket = null;
         try {
-          final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry);
+          bucket = new OClusterPositionMapBucket(cacheEntry);
           bucket.set(index, entry);
         } finally {
-          releasePageFromWrite(atomicOperation, cacheEntry);
+          releasePageFromWrite(atomicOperation, bucket);
         }
 
         endAtomicOperation(false, null);
@@ -331,12 +334,13 @@ public class OClusterPositionMap extends ODurableComponent {
           throw new OClusterPositionMapException(
               "Passed in cluster position " + clusterPosition + " is outside of range of cluster-position map", this);
 
+        OClusterPositionMapBucket bucket = null;
         final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, 1);
         try {
-          final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry);
+          bucket = new OClusterPositionMapBucket(cacheEntry);
           bucket.resurrect(index, entry);
         } finally {
-          releasePageFromWrite(atomicOperation, cacheEntry);
+          releasePageFromWrite(atomicOperation, bucket);
         }
 
         endAtomicOperation(false, null);
@@ -398,8 +402,9 @@ public class OClusterPositionMap extends ODurableComponent {
 
         Exception exception = null;
         final OCacheEntry cacheEntry = loadPageForWrite(atomicOperation, fileId, pageIndex, false, 1);
+        OClusterPositionMapBucket bucket = null;
         try {
-          final OClusterPositionMapBucket bucket = new OClusterPositionMapBucket(cacheEntry);
+          bucket = new OClusterPositionMapBucket(cacheEntry);
 
           bucket.remove(index);
         } catch (Exception e) {
@@ -409,7 +414,7 @@ public class OClusterPositionMap extends ODurableComponent {
                   this), e);
         } finally {
           try {
-            releasePageFromWrite(atomicOperation, cacheEntry);
+            releasePageFromWrite(atomicOperation, bucket);
           } finally {
             endAtomicOperation(exception != null, exception);
           }

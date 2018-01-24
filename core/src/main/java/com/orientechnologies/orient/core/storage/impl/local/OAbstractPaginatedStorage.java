@@ -5062,7 +5062,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         try {
           final ODurablePage durablePage = new ODurablePage(cacheEntry);
-          durablePage.rollbackChanges(updatePageRecord.getChanges());
+          //durablePage.rollbackChanges(updatePageRecord.getChanges());
           durablePage.setLsn(updatePageRecord.getPrevLsn());
         } finally {
           readCache.releaseFromWrite(cacheEntry, writeCache);
@@ -5131,7 +5131,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract
 
         try {
           ODurablePage durablePage = new ODurablePage(cacheEntry);
-          durablePage.restoreChanges(updatePageRecord.getChanges());
+          //durablePage.restoreData(updatePageRecord.getChanges());
           durablePage.setLsn(updatePageRecord.getLsn());
         } finally {
           readCache.releaseFromWrite(cacheEntry, writeCache);

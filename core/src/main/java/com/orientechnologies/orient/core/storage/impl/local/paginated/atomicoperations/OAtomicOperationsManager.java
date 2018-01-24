@@ -29,14 +29,19 @@ import com.orientechnologies.orient.core.OOrientListenerAbstract;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.exception.OStorageException;
+import com.orientechnologies.orient.core.storage.cache.OCacheEntry;
 import com.orientechnologies.orient.core.storage.cache.OReadCache;
 import com.orientechnologies.orient.core.storage.cache.OWriteCache;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.OStorageTransaction;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.base.ODurableComponent;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OAtomicUnitStartRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OLogSequenceNumber;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.ONonTxOperationPerformedWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OOperationUnitId;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OPageChanges;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OUpdatePageRecord;
+import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWALRecord;
 import com.orientechnologies.orient.core.storage.impl.local.paginated.wal.OWriteAheadLog;
 import com.orientechnologies.orient.core.storage.impl.local.statistic.OPerformanceStatisticManager;
 import com.orientechnologies.orient.core.tx.OTransactionInternal;
@@ -48,6 +53,7 @@ import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -130,13 +136,10 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
    * Starts atomic operation inside of current thread. If atomic operation has been already started, current atomic operation
    * instance will be returned. All durable components have to call this method at the beginning of any data modification
    * operation.
-   * <p>
    * <p>In current implementation of atomic operation, each component which is participated in atomic operation is hold under
    * exclusive lock till atomic operation will not be completed (committed or rolled back).
-   * <p>
    * <p>If other thread is going to read data from component it has to acquire read lock inside of atomic operation manager {@link
    * #acquireReadLock(ODurableComponent)}, otherwise data consistency will be compromised.
-   * <p>
    * <p>Atomic operation may be delayed if start of atomic operations is prohibited by call of {@link
    * #freezeAtomicOperations(Class, String)} method. If mentioned above method is called then execution of current method will be
    * stopped till call of {@link #releaseAtomicOperations(long)} method or exception will be thrown. Concrete behaviour depends on
@@ -196,7 +199,7 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
     }
 
     if (useWal && trackNonTxOperations && storage.getStorageTransaction() == null)
-      writeAheadLog.log(new ONonTxOperationPerformedWALRecord());
+      operation.setLastLsn(writeAheadLog.log(new ONonTxOperationPerformedWALRecord(lsn)));
 
     if (lockName != null)
       acquireExclusiveLockTillOperationComplete(operation, lockName);
@@ -373,8 +376,35 @@ public class OAtomicOperationsManager implements OAtomicOperationsMangerMXBean {
     if (counter == 1) {
       final boolean useWal = useWal();
 
-      if (!operation.isRollback())
-        operation.commitChanges(useWal ? writeAheadLog : null);
+      if (operation.isRollback()) {
+        OLogSequenceNumber lastLsn = operation.getLastLsn();
+
+        OWALRecord record = writeAheadLog.read(lastLsn);
+        while (true) {
+          if (record instanceof OUpdatePageRecord) {
+            final OUpdatePageRecord updatePageRecord = (OUpdatePageRecord) record;
+
+            final OCacheEntry cacheEntry = readCache
+                .loadForWrite(updatePageRecord.getFileId(), updatePageRecord.getPageIndex(), true, writeCache, 1, true);
+            final ByteBuffer buffer = cacheEntry.getCachePointer().getExclusiveBuffer();
+            final OPageChanges pageChanges = updatePageRecord.getChanges();
+            pageChanges.restoreData(buffer);
+            cacheEntry.markDirty();
+
+            readCache.releaseFromWrite(cacheEntry, writeCache);
+            lastLsn = updatePageRecord.getPrevLsn();
+            record = writeAheadLog.read(lastLsn);
+          } else if (record instanceof OAtomicUnitStartRecord) {
+            break;
+          } else if (record instanceof ONonTxOperationPerformedWALRecord){
+            final ONonTxOperationPerformedWALRecord nonTxRecord = (ONonTxOperationPerformedWALRecord) record;
+            lastLsn = nonTxRecord.getPrevLsn();
+            record = writeAheadLog.read(lastLsn);
+          } else {
+            throw new IllegalStateException("Invalied record type " + record);
+          }
+        }
+      }
 
       if (useWal)
         lsn = writeAheadLog.logAtomicOperationEndRecord(operation.getOperationUnitId(), rollback, operation.getStartLSN(),
