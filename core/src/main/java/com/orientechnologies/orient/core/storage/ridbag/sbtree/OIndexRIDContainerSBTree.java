@@ -59,11 +59,11 @@ public class OIndexRIDContainerSBTree implements Set<OIdentifiable> {
   public OIndexRIDContainerSBTree(long fileId, OAbstractPaginatedStorage storage) {
     String fileName;
 
-    OAtomicOperation atomicOperation = storage.getAtomicOperationsManager().getCurrentOperation();
-    if (atomicOperation == null)
-      fileName = storage.getWriteCache().fileNameById(fileId);
-    else
-      fileName = atomicOperation.fileNameById(fileId);
+   OAtomicOperation atomicOperation = storage.getAtomicOperationsManager().getCurrentOperation();
+//    if (atomicOperation == null)
+    fileName = storage.getWriteCache().fileNameById(fileId);
+//    else
+//      fileName = atomicOperation.fileNameById(fileId);
 
     tree = new OSBTreeBonsaiLocal<>(fileName.substring(0, fileName.length() - INDEX_FILE_EXTENSION.length()), INDEX_FILE_EXTENSION,
         storage);
@@ -75,11 +75,11 @@ public class OIndexRIDContainerSBTree implements Set<OIdentifiable> {
       OAbstractPaginatedStorage storage) {
     String fileName;
 
-    OAtomicOperation atomicOperation = storage.getAtomicOperationsManager().getCurrentOperation();
-    if (atomicOperation == null)
+//    OAtomicOperation atomicOperation = storage.getAtomicOperationsManager().getCurrentOperation();
+//    if (atomicOperation == null)
       fileName = storage.getWriteCache().fileNameById(fileId);
-    else
-      fileName = atomicOperation.fileNameById(fileId);
+//    else
+//      fileName = atomicOperation.fileNameById(fileId);
 
     tree = new OSBTreeBonsaiLocal<>(fileName.substring(0, fileName.length() - INDEX_FILE_EXTENSION.length()), INDEX_FILE_EXTENSION,
         storage);

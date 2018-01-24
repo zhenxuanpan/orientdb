@@ -143,11 +143,11 @@ public class OSBTreeCollectionManagerShared extends OSBTreeCollectionManagerAbst
   protected OSBTreeBonsai<OIdentifiable, Integer> loadTree(OBonsaiCollectionPointer collectionPointer) {
     String fileName;
     OAtomicOperation atomicOperation = storage.getAtomicOperationsManager().getCurrentOperation();
-    if (atomicOperation == null) {
+//    if (atomicOperation == null) {
       fileName = storage.getWriteCache().fileNameById(collectionPointer.getFileId());
-    } else {
-      fileName = atomicOperation.fileNameById(collectionPointer.getFileId());
-    }
+//    } else {
+//      fileName = atomicOperation.fileNameById(collectionPointer.getFileId());
+//    }
 
     OSBTreeBonsaiLocal<OIdentifiable, Integer> tree = new OSBTreeBonsaiLocal<>(
         fileName.substring(0, fileName.length() - DEFAULT_EXTENSION.length()), DEFAULT_EXTENSION, storage);

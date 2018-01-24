@@ -982,7 +982,7 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
       final OReadCache readCache = storage.getReadCache();
       final OWriteCache writeCache = storage.getWriteCache();
 
-      if (atomicOperation == null) {
+//      if (atomicOperation == null) {
         try {
           final String fileName = getName() + OIndexRIDContainer.INDEX_FILE_EXTENSION;
           if (writeCache.exists(fileName)) {
@@ -992,17 +992,17 @@ public abstract class OIndexAbstract<T> implements OIndexInternal<T> {
         } catch (IOException e) {
           OLogManager.instance().error(this, "Cannot delete file for value containers", e);
         }
-      } else {
-        try {
-          final String fileName = getName() + OIndexRIDContainer.INDEX_FILE_EXTENSION;
-          if (atomicOperation.isFileExists(fileName)) {
-            final long fileId = atomicOperation.loadFile(fileName);
-            atomicOperation.deleteFile(fileId);
-          }
-        } catch (IOException e) {
-          OLogManager.instance().error(this, "Cannot delete file for value containers", e);
-        }
-      }
+//      } else {
+//        try {
+//          final String fileName = getName() + OIndexRIDContainer.INDEX_FILE_EXTENSION;
+//          if (atomicOperation.isFileExists(fileName)) {
+//            final long fileId = atomicOperation.loadFile(fileName);
+//            atomicOperation.deleteFile(fileId);
+//          }
+//        } catch (IOException e) {
+//          OLogManager.instance().error(this, "Cannot delete file for value containers", e);
+//        }
+//      }
 
     }
   }

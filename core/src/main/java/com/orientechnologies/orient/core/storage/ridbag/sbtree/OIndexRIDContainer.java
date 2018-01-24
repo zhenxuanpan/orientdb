@@ -73,33 +73,33 @@ public class OIndexRIDContainer implements Set<OIdentifiable> {
   private long resolveFileIdByName(String fileName) {
     final OAbstractPaginatedStorage storage = (OAbstractPaginatedStorage) ODatabaseRecordThreadLocal.instance().get().getStorage()
         .getUnderlying();
-    final OAtomicOperation atomicOperation;
-    try {
-      atomicOperation = storage.getAtomicOperationsManager().startAtomicOperation(fileName, true);
-    } catch (IOException e) {
-      throw OException.wrapException(new OIndexEngineException("Error creation of sbtree with name " + fileName, fileName), e);
-    }
+//    final OAtomicOperation atomicOperation;
+//    try {
+//      atomicOperation = storage.getAtomicOperationsManager().startAtomicOperation(fileName, true);
+//    } catch (IOException e) {
+//      throw OException.wrapException(new OIndexEngineException("Error creation of sbtree with name " + fileName, fileName), e);
+//    }
 
     try {
       final OReadCache readCache = storage.getReadCache();
       final OWriteCache writeCache = storage.getWriteCache();
 
-      if (atomicOperation == null) {
+//      if (atomicOperation == null) {
         if (writeCache.exists(fileName))
           return writeCache.fileIdByName(fileName);
 
         return readCache.addFile(fileName, writeCache);
-      } else {
-        long fileId;
+//      } else {
+//        long fileId;
 
-        if (atomicOperation.isFileExists(fileName))
-          fileId = atomicOperation.loadFile(fileName);
-        else
-          fileId = atomicOperation.addFile(fileName);
-
-        storage.getAtomicOperationsManager().endAtomicOperation(false, null);
-        return fileId;
-      }
+//        if (atomicOperation.isFileExists(fileName))
+//          fileId = atomicOperation.loadFile(fileName);
+//        else
+//          fileId = atomicOperation.addFile(fileName);
+//
+//        storage.getAtomicOperationsManager().endAtomicOperation(false, null);
+//        return fileId;
+//      }
     } catch (IOException e) {
       try {
         storage.getAtomicOperationsManager().endAtomicOperation(true, e);

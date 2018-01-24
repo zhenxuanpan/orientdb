@@ -616,15 +616,15 @@ public class OPaginatedCluster extends ODurableComponent implements OCluster {
     if (atomicOperation == null)
       return;
 
-    ORecordOperationMetadata recordOperationMetadata = (ORecordOperationMetadata) atomicOperation
-        .getMetadata(ORecordOperationMetadata.RID_METADATA_KEY);
+//    ORecordOperationMetadata recordOperationMetadata = (ORecordOperationMetadata) atomicOperation
+//        .getMetadata(ORecordOperationMetadata.RID_METADATA_KEY);
 
-    if (recordOperationMetadata == null) {
-      recordOperationMetadata = new ORecordOperationMetadata();
-      atomicOperation.addMetadata(recordOperationMetadata);
-    }
+//    if (recordOperationMetadata == null) {
+//      recordOperationMetadata = new ORecordOperationMetadata();
+//      atomicOperation.addMetadata(recordOperationMetadata);
+//    }
 
-    recordOperationMetadata.addRid(rid);
+//    recordOperationMetadata.addRid(rid);
   }
 
   private static int getEntryContentLength(int grownContentSize) {
